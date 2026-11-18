@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { EmailVerification } from "@/components/email-verification";
 import { PhoneVerification } from "@/components/phone-verification";
 import { allowPhoneSimulation } from "@/modules/identity/phone-verification";
 import { requireUser } from "@/modules/identity/session";
@@ -12,7 +13,7 @@ export default async function ProfilePage() {
   const user = await requireUser("/perfil");
   const profile = await prisma.user.findUniqueOrThrow({
     where: { id: user.id },
-    select: { name: true, email: true, phone: true, phoneVerifiedAt: true, addresses: { where: { isDefault: true }, select: { line: true, sector: true, city: true, reference: true } } },
+    select: { name: true, email: true, emailVerified: true, phone: true, phoneVerifiedAt: true, addresses: { where: { isDefault: true }, select: { line: true, sector: true, city: true, reference: true } } },
   });
   const address = profile.addresses[0];
 
@@ -26,6 +27,11 @@ export default async function ProfilePage() {
       <section className="flex flex-col gap-5 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
         <h2 className="text-[17px] font-bold">Tus datos</h2>
         <ProfileForm name={profile.name ?? ""} />
+      </section>
+
+      <section id="email" className="flex scroll-mt-24 flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
+        <h2 className="text-[17px] font-bold">Tu email</h2>
+        <EmailVerification email={profile.email} verified={Boolean(profile.emailVerified)} />
       </section>
 
       <section className="flex flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">

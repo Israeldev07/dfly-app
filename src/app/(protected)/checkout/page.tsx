@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Mail } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { PhoneVerification } from "@/components/phone-verification";
 import { allowPhoneSimulation } from "@/modules/identity/phone-verification";
@@ -11,7 +13,7 @@ export const metadata: Metadata = { title: "Confirmar pedido" };
 export default async function CheckoutPage() {
   const user = await requireUser("/checkout");
   const [profile, address] = await Promise.all([
-    prisma.user.findUnique({ where: { id: user.id }, select: { phone: true, phoneVerifiedAt: true } }),
+    prisma.user.findUnique({ where: { id: user.id }, select: { phone: true, phoneVerifiedAt: true, emailVerified: true } }),
     prisma.address.findFirst({
       where: { userId: user.id, isDefault: true },
       select: { line: true, sector: true, reference: true },
@@ -43,6 +45,18 @@ export default async function CheckoutPage() {
             allowSimulate={allowPhoneSimulation()}
           />
         </section>
+        {profile?.emailVerified ? null : (
+          <p className="flex items-start gap-2 text-[14px] text-ink-soft lg:col-start-1">
+            <Mail aria-hidden className="mt-px size-4 flex-none text-store" strokeWidth={2} />
+            <span>
+              Aún no verificas tu email. Puedes pedir igual;{" "}
+              <Link href="/perfil#email" className="font-semibold text-brand underline underline-offset-2 hover:text-brand-deep">
+                verifícalo en tu perfil
+              </Link>{" "}
+              para proteger tu cuenta.
+            </span>
+          </p>
+        )}
       </div>
       <CheckoutForm
         deliveryFeeCents={deliveryFeeCents()}

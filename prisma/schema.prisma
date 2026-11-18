@@ -18,7 +18,12 @@ model User {
   id              String    @id @default(cuid())
   name            String?
   email           String    @unique
+  /// Cuándo se verificó el email (código enviado por correo, o Google con `email_verified`).
   emailVerified   DateTime?
+  /// HMAC del código de 6 dígitos enviado por email; nunca el código en claro.
+  emailCodeHash      String?
+  emailCodeExpiresAt DateTime?
+  emailCodeAttempts  Int       @default(0)
   image           String?
   /// Hash bcrypt. Null para usuarios que solo entran por OAuth.
   password        String?

@@ -14,6 +14,8 @@ export const RATE_LIMITS = {
   "order:user": { limit: 5, windowSec: 10 * 60 },
   /** Códigos para verificar el celular (no envían nada, pero evita rotar números sin parar). */
   "phone-code:user": { limit: 6, windowSec: 60 * 60 },
+  /** Cada código de email es un envío real (cuesta y puede ir a spam). */
+  "email-code:user": { limit: 5, windowSec: 60 * 60 },
 } as const satisfies Record<string, { limit: number; windowSec: number; blockSec?: number }>;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;

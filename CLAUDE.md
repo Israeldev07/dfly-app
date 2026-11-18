@@ -75,6 +75,8 @@ Invariantes:
 
 **Celular verificado**: Dfly nunca escribe primero a un número sin verificar. El cliente demuestra que el celular es suyo enviando desde ese WhatsApp un código (`Verificar Dfly: K7P4QX`, enlace `wa.me` a `DFLY_WHATSAPP_NUMBER`); el webhook (`identity/phone-verification.ts#verifyPhoneFromMessage`) solo lo acepta si el remitente es ese mismo número y marca `User.phoneVerifiedAt`. Cambiar el número borra la verificación; el perfil ya no edita el celular directamente. `createOrderAction` exige celular verificado y toma `customerPhone` de la BD, nunca del formulario. En desarrollo, el componente `PhoneVerification` muestra un botón para simular el mensaje.
 
+**Email verificado**: no bloquea pedidos (solo un aviso en el checkout y el bloque en `/perfil#email`). `identity/email-verification.ts` envía un código de 6 dígitos por Resend (`lib/email.ts`, `RESEND_API_KEY` + `EMAIL_FROM`; sin ellas, en desarrollo se registra como `[email:dev]`), guarda solo su HMAC con `AUTH_SECRET` (`emailCodeHash`), vence a los 15 min y admite 5 intentos, contados antes de comparar. Las cuentas de Google con `email_verified` se marcan en `events.signIn` de `auth.ts`.
+
 **Carrito**: estado cliente con Zustand persistido (`ordering/cart-store.ts`), un solo comercio por carrito; en el checkout los precios del cliente se ignoran.
 
 **Catálogo real**: fuente, el catálogo de WhatsApp Business de Dfly (sin promociones temporales ni productos sin precio). `prisma/import-catalog.ts` hace upsert del comercio por `slug` (nombre, descripción, WhatsApp; no toca sector, tiempo de entrega, visibilidad ni imagen, que se ajustan en `/admin`) y del producto por nombre dentro del comercio (precio y descripción); nunca borra.

@@ -16,6 +16,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  events: {
+    // Google ya verificó el email: no hace falta pedir código a esas cuentas.
+    async signIn({ user, account, profile }) {
+      if (account?.provider !== "google" || profile?.email_verified !== true || !user.id) return;
+      await prisma.user.updateMany({ where: { id: user.id, emailVerified: null }, data: { emailVerified: new Date() } });
+    },
+  },
   providers: [
     ...authConfig.providers,
     Credentials({

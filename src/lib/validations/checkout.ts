@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ecuadorMobileSchema } from "./auth";
 
 const cartItemsSchema = z
   .array(
@@ -28,7 +27,6 @@ export const checkoutSchema = z.object({
   addressLine: z.string().trim().min(5, "Escribe calle y número").max(160),
   sector: z.string().trim().min(2, "Indica tu barrio o sector").max(60),
   reference: z.string().trim().max(160).optional().transform((v) => v || null),
-  phone: ecuadorMobileSchema,
   notes: z.string().trim().max(300, "Máximo 300 caracteres").optional().transform((v) => v || null),
   paymentMethod: z.enum(["CASH", "TRANSFER"], { error: "Elige cómo vas a pagar" }),
   ageConfirmed: z.literal("on").optional(),

@@ -31,7 +31,9 @@ export const registerSchema = loginSchema.extend({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 
+/** El celular no se edita aquí: solo cambia verificándolo (`phoneSchema`). */
 export const profileSchema = z.object({
   name: z.string().trim().min(2, "Ingresa tu nombre").max(80),
-  phone: ecuadorMobileSchema,
 });
+
+export const phoneSchema = z.object({ phone: ecuadorMobileSchema });

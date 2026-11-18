@@ -25,6 +25,12 @@ model User {
   role            Role      @default(CUSTOMER)
   /// Teléfono en formato E.164 (p. ej. +593991234567). Obligatorio antes de pedir.
   phone           String?
+  /// Cuándo el usuario demostró que `phone` es suyo escribiendo a Dfly por WhatsApp. Se borra si cambia el número.
+  /// Sin esto no se puede pedir ni se le envía nada por WhatsApp.
+  phoneVerifiedAt DateTime?
+  /// Código que el usuario debe enviar desde `phone` al WhatsApp de Dfly. Un solo código vigente por usuario.
+  phoneCode       String?   @unique
+  phoneCodeExpiresAt DateTime?
   /// Consentimiento explícito para recibir mensajes de WhatsApp (requisito de Meta).
   whatsappOptInAt DateTime?
   createdAt       DateTime  @default(now())

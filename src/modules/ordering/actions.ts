@@ -28,7 +28,7 @@ export type CheckoutState = {
   deliveryFeeCents?: number;
 };
 
-const KEPT_FIELDS = ["addressLine", "sector", "reference", "phone", "notes", "paymentMethod", "ageConfirmed"] as const;
+const KEPT_FIELDS = ["addressLine", "sector", "reference", "notes", "paymentMethod", "ageConfirmed"] as const;
 
 /** Productos disponibles (con precio y opciones de la BD) de un comercio activo. */
 function availableProducts(storeId: string, productIds: string[]): Promise<ProductWithOptions[]> {
@@ -69,6 +69,16 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
     return { fieldErrors, error: fieldErrors.items ?? fieldErrors.storeId ?? fieldErrors.expectedTotalCents, values };
   }
   const input = parsed.data;
+
+  // Solo se escribe por WhatsApp a un celular que el cliente verificó; nunca al que escriba en el formulario.
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { name: true, email: true, phone: true, phoneVerifiedAt: true },
+  });
+  if (!user.phone || !user.phoneVerifiedAt) {
+    return { error: "Verifica tu celular por WhatsApp antes de hacer tu pedido.", values };
+  }
+  const customerPhone = user.phone;
 
   const store = await prisma.store.findFirst({
     where: { id: input.storeId, isActive: true },
@@ -129,7 +139,6 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
     return { error: `Hiciste varios pedidos seguidos. Podrás hacer otro en ${retryAfterLabel(limit.retryAfterSec)}.`, values };
   }
 
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { name: true, email: true } });
   const customerName = user.name?.trim() || user.email;
   const deliveryAddress = [input.addressLine, input.sector, store.city].join(", ") +
     (input.reference ? ` (Ref: ${input.reference})` : "");
@@ -150,7 +159,7 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
             notes: input.notes,
             paymentMethod: input.paymentMethod,
             customerName,
-            customerPhone: input.phone,
+            customerPhone,
             deliveryAddress,
             items: { create: lines },
             events: { create: { from: null, to: "PENDING", actor: "CUSTOMER" } },
@@ -158,7 +167,6 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
           select: { id: true, publicCode: true },
         });
 
-        await tx.user.update({ where: { id: userId }, data: { phone: input.phone } });
         await saveDefaultAddress(tx, userId, input.addressLine, input.sector, store.city, input.reference);
 
         const items = lines.map((l) => ({ name: l.nameSnapshot, options: l.optionsSummary, quantity: l.quantity }));
@@ -173,7 +181,7 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
             items,
             storeNotes: input.notes,
             customerName,
-            customerPhone: input.phone,
+            customerPhone,
             deliveryAddress,
             paymentMethod: input.paymentMethod,
             totalLabel: formatUsd(totals.totalCents),

@@ -73,6 +73,8 @@ Invariantes:
 - `Store.whatsappPhone` y los datos del cliente (`customerName/Phone`, `deliveryAddress`, snapshot en `Order`) nunca llegan al comercio ni al navegador ajeno.
 - `messaging/transport.ts` usa la Cloud API si hay credenciales; si no, `DevLogTransport`. Los mensajes son plantillas de Meta (`template` + `bodyParams` + `quickReplies`).
 
+**Celular verificado**: Dfly nunca escribe primero a un número sin verificar. El cliente demuestra que el celular es suyo enviando desde ese WhatsApp un código (`Verificar Dfly: K7P4QX`, enlace `wa.me` a `DFLY_WHATSAPP_NUMBER`); el webhook (`identity/phone-verification.ts#verifyPhoneFromMessage`) solo lo acepta si el remitente es ese mismo número y marca `User.phoneVerifiedAt`. Cambiar el número borra la verificación; el perfil ya no edita el celular directamente. `createOrderAction` exige celular verificado y toma `customerPhone` de la BD, nunca del formulario. En desarrollo, el componente `PhoneVerification` muestra un botón para simular el mensaje.
+
 **Carrito**: estado cliente con Zustand persistido (`ordering/cart-store.ts`), un solo comercio por carrito; en el checkout los precios del cliente se ignoran.
 
 **Catálogo real**: fuente, el catálogo de WhatsApp Business de Dfly (sin promociones temporales ni productos sin precio). `prisma/import-catalog.ts` hace upsert del comercio por `slug` (nombre, descripción, WhatsApp; no toca sector, tiempo de entrega, visibilidad ni imagen, que se ajustan en `/admin`) y del producto por nombre dentro del comercio (precio y descripción); nunca borra.

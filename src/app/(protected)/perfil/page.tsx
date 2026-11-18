@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { PhoneVerification } from "@/components/phone-verification";
+import { allowPhoneSimulation } from "@/modules/identity/phone-verification";
 import { requireUser } from "@/modules/identity/session";
 import { ProfileForm } from "./profile-form";
 
@@ -10,7 +12,7 @@ export default async function ProfilePage() {
   const user = await requireUser("/perfil");
   const profile = await prisma.user.findUniqueOrThrow({
     where: { id: user.id },
-    select: { name: true, email: true, phone: true, addresses: { where: { isDefault: true }, select: { line: true, sector: true, city: true, reference: true } } },
+    select: { name: true, email: true, phone: true, phoneVerifiedAt: true, addresses: { where: { isDefault: true }, select: { line: true, sector: true, city: true, reference: true } } },
   });
   const address = profile.addresses[0];
 
@@ -23,7 +25,16 @@ export default async function ProfilePage() {
 
       <section className="flex flex-col gap-5 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
         <h2 className="text-[17px] font-bold">Tus datos</h2>
-        <ProfileForm name={profile.name ?? ""} phone={profile.phone ? profile.phone.replace(/^\+593/, "0") : ""} />
+        <ProfileForm name={profile.name ?? ""} />
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
+        <h2 className="text-[17px] font-bold">Tu celular</h2>
+        <PhoneVerification
+          phone={profile.phone ?? ""}
+          verified={Boolean(profile.phone && profile.phoneVerifiedAt)}
+          allowSimulate={allowPhoneSimulation()}
+        />
       </section>
 
       <section className="flex flex-col gap-2 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">

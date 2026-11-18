@@ -11,10 +11,12 @@ import { cartSummary, useCart, useCartHydrated } from "@/modules/ordering/cart-s
 
 type Props = {
   deliveryFeeCents: number;
-  defaults: { phone: string; addressLine: string; sector: string; reference: string };
+  /** Sin celular verificado no se puede pedir (el servidor también lo exige). */
+  phoneVerified: boolean;
+  defaults: { addressLine: string; sector: string; reference: string };
 };
 
-export function CheckoutForm({ deliveryFeeCents, defaults }: Props) {
+export function CheckoutForm({ deliveryFeeCents, phoneVerified, defaults }: Props) {
   const hydrated = useCartHydrated();
   const store = useCart((s) => s.store);
   const lines = useCart((s) => s.lines);
@@ -96,27 +98,14 @@ export function CheckoutForm({ deliveryFeeCents, defaults }: Props) {
             required
             error={fe.addressLine}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Barrio o sector"
-              name="sector"
-              placeholder="Ej. Centro, San Juan"
-              defaultValue={v.sector}
-              required
-              error={fe.sector}
-            />
-            <Field
-              label="Celular (WhatsApp)"
-              name="phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel-national"
-              placeholder="099 123 4567"
-              defaultValue={v.phone}
-              required
-              error={fe.phone}
-            />
-          </div>
+          <Field
+            label="Barrio o sector"
+            name="sector"
+            placeholder="Ej. Centro, San Juan"
+            defaultValue={v.sector}
+            required
+            error={fe.sector}
+          />
           <Field
             label="Referencia (opcional)"
             name="reference"
@@ -235,9 +224,13 @@ export function CheckoutForm({ deliveryFeeCents, defaults }: Props) {
           </div>
         ) : null}
 
-        <SubmitButton pendingLabel="Enviando tu pedido…">Hacer pedido · {formatUsd(totalCents)}</SubmitButton>
-        <p className="text-center text-[12.5px] text-ink-soft">
-          Te avisaremos por WhatsApp cuando el comercio confirme.
+        <SubmitButton pendingLabel="Enviando tu pedido…" disabled={!phoneVerified}>
+          Hacer pedido · {formatUsd(totalCents)}
+        </SubmitButton>
+        <p className={`text-center text-[12.5px] ${phoneVerified ? "text-ink-soft" : "font-semibold text-brand-deep"}`}>
+          {phoneVerified
+            ? "Te avisaremos por WhatsApp cuando el comercio confirme."
+            : "Verifica tu celular para poder hacer tu pedido."}
         </p>
       </aside>
     </form>

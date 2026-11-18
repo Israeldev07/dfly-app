@@ -45,6 +45,8 @@ export const TEMPLATES = {
   adminExpired: "pedido_sin_respuesta_admin",
   customerCancelled: "pedido_cancelado_cliente",
   storeCancelled: "pedido_cancelado_comercio",
+  storeLate: "pedido_vencido_comercio",
+  adminLate: "respuesta_tardia_admin",
 } as const;
 
 const LANG = "es";
@@ -160,5 +162,42 @@ export function storeCancelledMessage(o: Pick<StoreOrderView, "publicCode" | "st
     language: LANG,
     bodyParams: params,
     preview: `Pedido #${params[0]} de Dfly para ${params[1]} fue CANCELADO. No lo prepares.`,
+  };
+}
+
+type LateState = "EXPIRED" | "CANCELLED";
+
+/**
+ * Al comercio cuando el pedido deja de estar vigente (vence o se cancela tras su respuesta tardía):
+ * solo código, su nombre y el estado. Nunca datos del cliente. Sirve antes y después de que pulse.
+ */
+export function storeLateResponseMessage(
+  o: Pick<StoreOrderView, "publicCode" | "storeName">,
+  state: LateState,
+): OutgoingMessage {
+  const params = [o.publicCode, o.storeName, state === "EXPIRED" ? "VENCIDO" : "CANCELADO"].map(toParam);
+  return {
+    template: TEMPLATES.storeLate,
+    language: LANG,
+    bodyParams: params,
+    preview: `Pedido #${params[0]} de Dfly para ${params[1]} ya está ${params[2]}: NO lo prepares. Si pulsas Aceptar o Rechazar, no se registrará. Dfly te contactará si hace falta.`,
+  };
+}
+
+/** Al dueño: el comercio pulsó un botón con el pedido ya vencido o cancelado. */
+export function adminLateResponseMessage(
+  publicCode: string,
+  storeName: string,
+  accepted: boolean,
+  state: LateState,
+): OutgoingMessage {
+  const params = [publicCode, storeName, accepted ? "ACEPTAR" : "RECHAZAR", state === "EXPIRED" ? "vencido" : "cancelado"].map(
+    toParam,
+  );
+  return {
+    template: TEMPLATES.adminLate,
+    language: LANG,
+    bodyParams: params,
+    preview: `Pedido #${params[0]}: ${params[1]} pulsó ${params[2]} con el pedido ya ${params[3]}.`,
   };
 }

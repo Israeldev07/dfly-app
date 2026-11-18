@@ -18,6 +18,17 @@ export function canTransition(from: OrderStatus, to: OrderStatus) {
   return TRANSITIONS[from].includes(to);
 }
 
+/** Estados en los que una respuesta del comercio llega tarde y hay que avisarle que no la prepare. */
+export type LateReplyState = "EXPIRED" | "CANCELLED";
+
+/**
+ * Si el comercio responde y el pedido ya no está en SENT_TO_STORE: en EXPIRED o CANCELLED
+ * se le avisa (y al dueño); en ACCEPTED/REJECTED es una doble pulsación y se ignora.
+ */
+export function lateReplyState(status: OrderStatus): LateReplyState | null {
+  return status === "EXPIRED" || status === "CANCELLED" ? status : null;
+}
+
 export type PricedLine = { unitPriceCents: number; quantity: number };
 
 export function computeTotals(lines: PricedLine[], deliveryFeeCents: number) {

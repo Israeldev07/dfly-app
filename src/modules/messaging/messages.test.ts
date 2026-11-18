@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminLateResponseMessage,
   adminNewOrderMessage,
   customerCancelledMessage,
   sanitizeStoreNotes,
   storeCancelledMessage,
+  storeLateResponseMessage,
   storeRequestMessage,
   toParam,
   type AdminOrderView,
@@ -60,6 +62,32 @@ describe("toParam", () => {
   it("elimina saltos de línea y espacios repetidos que Meta rechaza", () => {
     expect(toParam("línea 1\nlínea 2\t\tfin     ok")).toBe("línea 1 / línea 2 / fin ok");
     expect(toParam("   ")).toBe("-");
+  });
+});
+
+describe("avisos de respuesta tardía", () => {
+  it("el comercio solo recibe código, su nombre y el estado", () => {
+    const msg = storeLateResponseMessage(order, "EXPIRED");
+    const everything = JSON.stringify(msg);
+    expect(everything).not.toContain("María");
+    expect(everything).not.toContain("991234567");
+    expect(everything).not.toContain("Bolívar");
+    expect(msg.bodyParams).toEqual(["A7K3P", "Fritadas El Lago", "VENCIDO"]);
+    expect(msg.quickReplies).toBeUndefined();
+    expect(storeLateResponseMessage(order, "CANCELLED").bodyParams[2]).toBe("CANCELADO");
+  });
+
+  it("el dueño sabe qué pulsó el comercio y en qué estado estaba el pedido", () => {
+    expect(adminLateResponseMessage("A7K3P", "Fritadas El Lago", true, "EXPIRED").bodyParams).toEqual([
+      "A7K3P",
+      "Fritadas El Lago",
+      "ACEPTAR",
+      "vencido",
+    ]);
+    expect(adminLateResponseMessage("A7K3P", "Fritadas El Lago", false, "CANCELLED").bodyParams.slice(2)).toEqual([
+      "RECHAZAR",
+      "cancelado",
+    ]);
   });
 });
 

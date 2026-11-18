@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     try {
       const result = await applyStoreResponse(action.orderId, action.action, tap.from, tap.messageId);
       console.info(`[webhook] pedido ${action.orderId}: ${action.action} → ${result}`);
-      if (result === "applied") touchedOrders.add(action.orderId);
+      if (result === "applied" || result === "late-noticed") touchedOrders.add(action.orderId);
     } catch (error) {
       // Se siguen procesando las demás; la fallida no quedó registrada y se reintenta.
       console.error(`[webhook] error al aplicar ${action.action} al pedido ${action.orderId}`, error);

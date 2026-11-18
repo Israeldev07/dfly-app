@@ -2,13 +2,26 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import type { StoreAction } from "@/modules/messaging/action-payload";
-import { adminExpiredMessage, adminResultMessage, customerResultMessage } from "@/modules/messaging/messages";
+import {
+  adminExpiredMessage,
+  adminLateResponseMessage,
+  adminResultMessage,
+  customerResultMessage,
+  storeLateResponseMessage,
+} from "@/modules/messaging/messages";
 import { adminPhone, enqueue } from "@/modules/messaging/outbox";
+import { lateReplyState } from "./domain";
 import { transitionOrder } from "./transitions";
 
 const digits = (phone: string) => phone.replace(/\D/g, "");
 
-export type StoreResponseResult = "applied" | "already-answered" | "duplicate" | "not-found" | "wrong-sender";
+export type StoreResponseResult =
+  | "applied"
+  | "already-answered"
+  | "late-noticed"
+  | "duplicate"
+  | "not-found"
+  | "wrong-sender";
 
 /**
  * Aplica el Aceptar/Rechazar del comercio y encola los avisos al dueño y al cliente.
@@ -42,7 +55,38 @@ export async function applyStoreResponse(
       const changed = await transitionOrder(tx, orderId, "SENT_TO_STORE", accepted ? "ACCEPTED" : "REJECTED", "STORE", {
         respondedAt: new Date(),
       });
-      if (!changed) return "already-answered";
+      if (!changed) {
+        // Respuesta tardía: se relee el estado dentro de la transacción (la lectura previa puede estar desfasada).
+        const current = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } });
+        const lateState = current ? lateReplyState(current.status) : null;
+        if (!lateState) return "already-answered";
+        // Un solo aviso de cada tipo por pedido aunque el comercio pulse varias veces (cada pulsación trae otro
+        // waMessageId). Al expirar, el cron ya avisó al comercio; entonces solo falta avisar al dueño.
+        const [storeNoticed, adminNoticed] = await Promise.all([
+          tx.outboxMessage.count({ where: { orderId, kind: "STORE_LATE_RESPONSE" } }),
+          tx.outboxMessage.count({ where: { orderId, kind: "ADMIN_LATE_RESPONSE" } }),
+        ]);
+        if (storeNoticed > 0 && adminNoticed > 0) return "already-answered";
+        if (storeNoticed === 0) {
+          await enqueue(
+            tx,
+            orderId,
+            "STORE_LATE_RESPONSE",
+            order.store.whatsappPhone,
+            storeLateResponseMessage({ publicCode: order.publicCode, storeName: order.store.name }, lateState),
+          );
+        }
+        if (adminNoticed === 0) {
+          await enqueue(
+            tx,
+            orderId,
+            "ADMIN_LATE_RESPONSE",
+            ownerPhone,
+            adminLateResponseMessage(order.publicCode, order.store.name, accepted, lateState),
+          );
+        }
+        return "late-noticed";
+      }
 
       const firstName = order.customerName.split(/\s+/)[0] ?? order.customerName;
       await enqueue(tx, orderId, "ADMIN_RESULT", ownerPhone, adminResultMessage(order.publicCode, order.store.name, accepted));
@@ -62,17 +106,20 @@ export async function applyStoreResponse(
 }
 
 export function responseTimeoutMinutes() {
-  const n = Number(process.env.ORDER_RESPONSE_TIMEOUT_MIN ?? "10");
-  return Number.isFinite(n) && n > 0 ? n : 10;
+  const n = Number(process.env.ORDER_RESPONSE_TIMEOUT_MIN ?? "5");
+  return Number.isFinite(n) && n > 0 ? n : 5;
 }
 
-/** Marca como EXPIRED los pedidos sin respuesta y avisa al dueño para que llame al comercio. */
+/**
+ * Marca como EXPIRED los pedidos sin respuesta, avisa al dueño para que llame al comercio
+ * y al comercio para que no lo prepare (en la misma transacción).
+ */
 export async function expireStaleOrders() {
   const minutes = responseTimeoutMinutes();
   const cutoff = new Date(Date.now() - minutes * 60_000);
   const stale = await prisma.order.findMany({
     where: { status: "SENT_TO_STORE", updatedAt: { lte: cutoff } },
-    select: { id: true, publicCode: true, store: { select: { name: true } } },
+    select: { id: true, publicCode: true, store: { select: { name: true, whatsappPhone: true } } },
     take: 50,
   });
 
@@ -82,6 +129,13 @@ export async function expireStaleOrders() {
       const ok = await transitionOrder(tx, order.id, "SENT_TO_STORE", "EXPIRED", "SYSTEM");
       if (ok) {
         await enqueue(tx, order.id, "ADMIN_EXPIRED", adminPhone(), adminExpiredMessage(order.publicCode, order.store.name, minutes));
+        await enqueue(
+          tx,
+          order.id,
+          "STORE_LATE_RESPONSE",
+          order.store.whatsappPhone,
+          storeLateResponseMessage({ publicCode: order.publicCode, storeName: order.store.name }, "EXPIRED"),
+        );
       }
       return ok;
     });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canTransition, computeTotals, generatePublicCode } from "./domain";
+import { canTransition, computeTotals, generatePublicCode, lateReplyState } from "./domain";
 
 describe("máquina de estados del pedido", () => {
   it("permite el flujo feliz", () => {
@@ -12,6 +12,26 @@ describe("máquina de estados del pedido", () => {
     expect(canTransition("ACCEPTED", "REJECTED")).toBe(false);
     expect(canTransition("REJECTED", "ACCEPTED")).toBe(false);
     expect(canTransition("PENDING", "ACCEPTED")).toBe(false);
+  });
+
+  it("un pedido vencido no se puede aceptar ni rechazar, solo cancelar", () => {
+    expect(canTransition("EXPIRED", "ACCEPTED")).toBe(false);
+    expect(canTransition("EXPIRED", "REJECTED")).toBe(false);
+    expect(canTransition("EXPIRED", "CANCELLED")).toBe(true);
+  });
+});
+
+describe("lateReplyState", () => {
+  it("avisa solo si el pedido ya venció o se canceló", () => {
+    expect(lateReplyState("EXPIRED")).toBe("EXPIRED");
+    expect(lateReplyState("CANCELLED")).toBe("CANCELLED");
+  });
+
+  it("ignora la doble pulsación y los estados donde aún no hay respuesta tardía", () => {
+    expect(lateReplyState("ACCEPTED")).toBeNull();
+    expect(lateReplyState("REJECTED")).toBeNull();
+    expect(lateReplyState("PENDING")).toBeNull();
+    expect(lateReplyState("SENT_TO_STORE")).toBeNull();
   });
 });
 

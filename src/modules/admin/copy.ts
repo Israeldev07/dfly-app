@@ -26,6 +26,8 @@ export const MESSAGE_KIND: Record<OutboxKind, string> = {
   ADMIN_EXPIRED: "Aviso de vencido al dueño",
   CUSTOMER_CANCELLED: "Cancelación al cliente",
   STORE_CANCELLED: "Cancelación al comercio",
+  STORE_LATE_RESPONSE: "Pedido no vigente: aviso al comercio",
+  ADMIN_LATE_RESPONSE: "Respuesta tardía: aviso al dueño",
 };
 
 export const MESSAGE_STATUS: Record<OutboxStatus, { label: string; tone: Tone }> = {

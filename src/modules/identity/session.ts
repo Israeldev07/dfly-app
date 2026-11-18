@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -31,7 +32,8 @@ export async function assertAdmin() {
   return id;
 }
 
-async function isAdmin(userId: string) {
+// `cache`: el layout y la página del panel lo consultan en la misma petición.
+const isAdmin = cache(async (userId: string) => {
   const row = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   return row?.role === "ADMIN";
-}
+});

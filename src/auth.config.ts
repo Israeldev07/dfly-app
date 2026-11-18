@@ -20,9 +20,8 @@ export default {
       if (AUTH_PAGES.some((p) => path.startsWith(p))) {
         return isLoggedIn ? Response.redirect(new URL("/comercios", nextUrl)) : true;
       }
-      if (path.startsWith("/admin")) {
-        return auth?.user?.role === "ADMIN";
-      }
+      // `/admin` solo exige sesión aquí: el rol del JWT se fija al iniciar sesión y no se refresca,
+      // así que quien decide es `requireAdmin`, que lo lee de la base de datos.
       if (PROTECTED_PREFIXES.some((p) => path.startsWith(p))) {
         return isLoggedIn;
       }

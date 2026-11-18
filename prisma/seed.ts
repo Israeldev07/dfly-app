@@ -103,22 +103,59 @@ async function main() {
     });
   }
 
-  const adminEmail = process.env.SEED_ADMIN_EMAIL;
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
-  if (adminEmail && adminPassword) {
-    await prisma.user.upsert({
-      where: { email: adminEmail },
-      update: { role: "ADMIN" },
-      create: {
-        email: adminEmail,
+  await seedAdmin();
+  console.log(`Seed OK: ${stores.length} comercios`);
+}
+
+/**
+ * Crea el usuario ADMIN. El registro no verifica el email, así que una cuenta
+ * que ya existe con ese email pudo crearla otra persona: no se asciende salvo
+ * que quien ejecuta el seed lo pida con SEED_ADMIN_PROMOTE_EXISTING="true", y
+ * en ese caso se reemplaza la contraseña para que nadie conserve la anterior.
+ */
+async function seedAdmin() {
+  // Mismo formato que el login y el registro, que guardan el email en minúsculas.
+  const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!email || !password) return;
+
+  const existing = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, role: true },
+  });
+
+  if (!existing) {
+    await prisma.user.create({
+      data: {
+        email,
         name: "Admin Dfly",
         role: "ADMIN",
-        password: await bcrypt.hash(adminPassword, 12),
+        password: await bcrypt.hash(password, 12),
       },
     });
-    console.log(`Admin listo: ${adminEmail}`);
+    console.log(`Admin creado: ${email}`);
+    return;
   }
-  console.log(`Seed OK: ${stores.length} comercios`);
+
+  if (existing.role === "ADMIN") {
+    console.log(`Admin ya existente, sin cambios: ${email}`);
+    return;
+  }
+
+  if (process.env.SEED_ADMIN_PROMOTE_EXISTING !== "true") {
+    throw new Error(
+      `Ya existe una cuenta con el email ${email} y no es ADMIN. No se asciende ` +
+        "porque pudo registrarla otra persona. Si la cuenta es tuya, vuelve a ejecutar " +
+        'el seed con SEED_ADMIN_PROMOTE_EXISTING="true": se le dará el rol ADMIN y su ' +
+        "contraseña se reemplazará por SEED_ADMIN_PASSWORD.",
+    );
+  }
+
+  await prisma.user.update({
+    where: { id: existing.id },
+    data: { role: "ADMIN", password: await bcrypt.hash(password, 12) },
+  });
+  console.log(`Cuenta existente ascendida a ADMIN con contraseña nueva: ${email}`);
 }
 
 main()

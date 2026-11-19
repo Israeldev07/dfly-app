@@ -6,6 +6,7 @@ import {
   customerCanRequestCancel,
   generatePublicCode,
   lateReplyState,
+  storeReplyMustRetry,
 } from "./domain";
 
 describe("máquina de estados del pedido", () => {
@@ -63,6 +64,18 @@ describe("lateReplyState", () => {
     expect(lateReplyState("REJECTED")).toBeNull();
     expect(lateReplyState("PENDING")).toBeNull();
     expect(lateReplyState("SENT_TO_STORE")).toBeNull();
+  });
+});
+
+describe("storeReplyMustRetry", () => {
+  it("reintenta si el pedido le llegó al comercio pero el envío aún no quedó registrado", () => {
+    expect(storeReplyMustRetry("PENDING")).toBe(true);
+  });
+
+  it("no reintenta respuestas dobles ni tardías", () => {
+    for (const status of ["ACCEPTED", "REJECTED", "EXPIRED", "CANCELLED"] as const) {
+      expect(storeReplyMustRetry(status)).toBe(false);
+    }
   });
 });
 

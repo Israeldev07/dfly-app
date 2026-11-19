@@ -10,10 +10,22 @@ import {
   storeLateResponseMessage,
 } from "@/modules/messaging/messages";
 import { adminPhone, enqueue } from "@/modules/messaging/outbox";
-import { lateReplyState } from "./domain";
+import { lateReplyState, storeReplyMustRetry } from "./domain";
 import { transitionOrder } from "./transitions";
 
 const digits = (phone: string) => phone.replace(/\D/g, "");
+
+/**
+ * El comercio respondió antes de que quedara registrado el envío de su pedido (sigue en PENDING).
+ * Se lanza para revertir la transacción (sin dejar el WebhookEvent) y que el webhook responda 500:
+ * Meta reintenta la pulsación y, para entonces, el outbox ya habrá pasado el pedido a SENT_TO_STORE.
+ */
+export class StoreReplyTooEarlyError extends Error {
+  constructor(readonly orderId: string) {
+    super(`El pedido ${orderId} aún no figura como enviado al comercio`);
+    this.name = "StoreReplyTooEarlyError";
+  }
+}
 
 export type StoreResponseResult =
   | "applied"
@@ -58,6 +70,7 @@ export async function applyStoreResponse(
       if (!changed) {
         // Respuesta tardía: se relee el estado dentro de la transacción (la lectura previa puede estar desfasada).
         const current = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } });
+        if (current && storeReplyMustRetry(current.status)) throw new StoreReplyTooEarlyError(orderId);
         const lateState = current ? lateReplyState(current.status) : null;
         if (!lateState) return "already-answered";
         // Un solo aviso de cada tipo por pedido aunque el comercio pulse varias veces (cada pulsación trae otro

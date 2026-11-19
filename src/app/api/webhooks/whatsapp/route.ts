@@ -3,7 +3,7 @@ import { parseActionPayload } from "@/modules/messaging/action-payload";
 import { dispatchOrderMessages } from "@/modules/ordering/dispatch";
 import { extractButtonTaps, extractTextMessages, isValidSignature } from "@/modules/messaging/webhook";
 import { verifyPhoneFromMessage } from "@/modules/identity/phone-verification";
-import { applyStoreResponse } from "@/modules/ordering/store-response";
+import { applyStoreResponse, StoreReplyTooEarlyError } from "@/modules/ordering/store-response";
 
 /** Verificación del webhook que hace Meta al configurarlo. */
 export function GET(request: Request) {
@@ -51,7 +51,13 @@ export async function POST(request: Request) {
       if (result === "applied" || result === "late-noticed") touchedOrders.add(action.orderId);
     } catch (error) {
       // Se siguen procesando las demás; la fallida no quedó registrada y se reintenta.
-      console.error(`[webhook] error al aplicar ${action.action} al pedido ${action.orderId}`, error);
+      if (error instanceof StoreReplyTooEarlyError) {
+        // Se despacha el outbox para que el pedido pase a SENT_TO_STORE antes del reintento de Meta.
+        console.warn(`[webhook] ${error.message}; se pide a Meta que reintente ${action.action}`);
+        touchedOrders.add(action.orderId);
+      } else {
+        console.error(`[webhook] error al aplicar ${action.action} al pedido ${action.orderId}`, error);
+      }
       failed = true;
     }
   }

@@ -30,6 +30,15 @@ export function lateReplyState(status: OrderStatus): LateReplyState | null {
 }
 
 /**
+ * Si el comercio responde con el pedido aún en PENDING, el mensaje sí le llegó pero no se llegó a
+ * registrar el envío (falló la transacción posterior). La respuesta no se puede aplicar todavía ni
+ * descartar: hay que hacer que Meta la reintente cuando el outbox complete el paso a SENT_TO_STORE.
+ */
+export function storeReplyMustRetry(status: OrderStatus) {
+  return status === "PENDING";
+}
+
+/**
  * El cliente cancela al instante mientras el comercio no haya aceptado: recibido, esperando
  * al comercio o sin respuesta. Una vez aceptado, solo puede pedirlo desde Ayuda.
  */

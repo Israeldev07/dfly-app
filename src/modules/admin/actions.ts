@@ -14,8 +14,9 @@ import {
   type StoreInput,
 } from "@/lib/validations/admin";
 import { assertAdmin } from "@/modules/identity/session";
-import { dispatchOutbox } from "@/modules/messaging/outbox";
-import { cancelOrderByAdmin } from "@/modules/ordering/admin-cancel";
+import { dispatchOrderMessages } from "@/modules/ordering/dispatch";
+import { cancelOrderByAdmin } from "@/modules/ordering/cancel";
+import { rejectCancellationRequest } from "@/modules/ordering/cancel-requests";
 import { canRetryMessage, slugify } from "./domain";
 import { syncOptionGroups } from "./product-options";
 
@@ -59,7 +60,24 @@ export async function cancelOrderAction(_prev: AdminFormState, formData: FormDat
   const result = await cancelOrderByAdmin(orderId.data);
   if (result !== "cancelled") return { error: CANCEL_ERRORS[result] };
 
-  after(() => dispatchOutbox({ orderId: orderId.data }));
+  after(() => dispatchOrderMessages({ orderId: orderId.data }));
+  refresh();
+  return { ok: true };
+}
+
+/** Rechaza la solicitud de cancelación del cliente: el pedido sigue y se le avisa por WhatsApp. */
+export async function rejectCancelRequestAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  await assertAdmin();
+  const orderId = idSchema.safeParse(formData.get("orderId"));
+  if (!orderId.success) return { error: "Pedido inválido." };
+
+  const result = await rejectCancellationRequest(orderId.data);
+  if (result === "not-found") return { error: CANCEL_ERRORS["not-found"] };
+  if (result === "already-resolved") {
+    refresh();
+    return { error: "Esta solicitud ya se resolvió." };
+  }
+  after(() => dispatchOrderMessages({ orderId: orderId.data }));
   refresh();
   return { ok: true };
 }
@@ -82,7 +100,7 @@ export async function retryMessageAction(_prev: AdminFormState, formData: FormDa
     where: { id: messageId.data, status: "FAILED" },
     data: { status: "PENDING", attempts: 0, nextAttemptAt: new Date(), lastError: null },
   });
-  if (count > 0) after(() => dispatchOutbox({ orderId: msg.orderId }));
+  if (count > 0) after(() => dispatchOrderMessages({ orderId: msg.orderId }));
   refresh();
   return { ok: true };
 }

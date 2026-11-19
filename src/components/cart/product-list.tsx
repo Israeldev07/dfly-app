@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import Image from "next/image";
 import { Check, ChevronDown, Minus, Plus } from "lucide-react";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { groupRule, lineKey, priceSelection, type OptionGroupView } from "@/modules/catalog/options";
 import { MAX_QTY, useCart, useCartHydrated, type CartStore, type NewCartLine } from "@/modules/ordering/cart-store";
 

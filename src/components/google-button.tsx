@@ -1,4 +1,4 @@
-import { googleSignInAction } from "@/modules/identity/actions";
+import { googleSignInAction } from "@/modules/identity/auth-actions";
 
 /**
  * Solo se muestra si Google OAuth está configurado (AUTH_GOOGLE_ID).

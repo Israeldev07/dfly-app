@@ -3,7 +3,7 @@
  * Así Dfly nunca escribe primero a un número que nadie demostró que es suyo.
  * Puro (sin BD) para poder testearlo; la parte de servidor está en `phone-verification.ts`.
  */
-import { generatePublicCode } from "@/modules/ordering/domain";
+import { generateCode } from "@/lib/codes";
 
 export const PHONE_CODE_LENGTH = 6;
 export const PHONE_CODE_TTL_MIN = 30;
@@ -12,7 +12,7 @@ export const PHONE_CODE_TTL_MIN = 30;
 const CODE_RE = /(?:^|[^0-9A-Z])([2-9A-HJKMNP-Z]{6})(?![0-9A-Z])/g;
 
 export function generatePhoneCode() {
-  return generatePublicCode(PHONE_CODE_LENGTH);
+  return generateCode(PHONE_CODE_LENGTH);
 }
 
 /** Texto que se precarga en WhatsApp. */

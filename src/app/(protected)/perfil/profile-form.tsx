@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Field, SubmitButton } from "@/components/forms";
-import { updateProfileAction, type ProfileState } from "@/modules/identity/actions";
+import { updateProfileAction, type ProfileState } from "@/modules/identity/profile-actions";
 
 export function ProfileForm({ name }: { name: string }) {
   const [state, action] = useActionState<ProfileState, FormData>(updateProfileAction, {});

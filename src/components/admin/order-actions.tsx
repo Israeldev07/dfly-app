@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { LoaderCircle, RotateCw } from "lucide-react";
-import { cancelOrderAction, retryMessageAction, type AdminFormState } from "@/modules/admin/actions";
+import { cancelOrderAction, rejectCancelRequestAction, retryMessageAction, type AdminFormState } from "@/modules/admin/actions";
 
 function PendingButton({ children, pendingLabel, className }: { children: React.ReactNode; pendingLabel: string; className: string }) {
   const { pending } = useFormStatus();
@@ -22,7 +22,15 @@ function PendingButton({ children, pendingLabel, className }: { children: React.
 }
 
 /** Cancelar en dos pasos, sin modal: el primer clic muestra qué va a pasar y pide confirmación. */
-export function CancelOrder({ orderId, storeWillBeNotified }: { orderId: string; storeWillBeNotified: boolean }) {
+export function CancelOrder({
+  orderId,
+  storeWillBeNotified,
+  label = "Cancelar pedido",
+}: {
+  orderId: string;
+  storeWillBeNotified: boolean;
+  label?: string;
+}) {
   const [state, action] = useActionState<AdminFormState, FormData>(cancelOrderAction, {});
   const [confirming, setConfirming] = useState(false);
 
@@ -34,7 +42,7 @@ export function CancelOrder({ orderId, storeWillBeNotified }: { orderId: string;
           onClick={() => setConfirming(true)}
           className="inline-flex h-11 items-center justify-center rounded-control px-4 text-[15px] font-semibold text-brand-deep ring-1 ring-brand/40 transition-colors duration-150 hover:bg-brand/[0.06]"
         >
-          Cancelar pedido
+          {label}
         </button>
         {state.error ? (
           <p role="alert" className="text-[13.5px] font-medium text-brand-deep">
@@ -67,6 +75,27 @@ export function CancelOrder({ orderId, storeWillBeNotified }: { orderId: string;
           No, volver
         </button>
       </div>
+    </form>
+  );
+}
+
+/** Rechaza la solicitud de cancelación: el pedido sigue en curso y se avisa al cliente. */
+export function RejectCancelRequest({ orderId }: { orderId: string }) {
+  const [state, action] = useActionState<AdminFormState, FormData>(rejectCancelRequestAction, {});
+  return (
+    <form action={action} className="flex flex-col gap-2">
+      <input type="hidden" name="orderId" value={orderId} />
+      <PendingButton
+        pendingLabel="Rechazando…"
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-control px-4 text-[15px] font-semibold text-ink ring-1 ring-ink/20 transition-colors duration-150 hover:bg-ink/[0.05] disabled:cursor-progress disabled:opacity-70"
+      >
+        Rechazar solicitud
+      </PendingButton>
+      {state.error ? (
+        <p role="alert" className="text-[13.5px] font-medium text-brand-deep">
+          {state.error}
+        </p>
+      ) : null}
     </form>
   );
 }

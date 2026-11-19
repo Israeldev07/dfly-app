@@ -45,6 +45,7 @@ model User {
   sessions  Session[]
   addresses Address[]
   orders    Order[]
+  cancellationRequests CancellationRequest[]
 
   @@map("users")
 }
@@ -249,6 +250,8 @@ model Order {
   items    OrderItem[]
   events   OrderStatusEvent[]
   messages OutboxMessage[]
+  /// Solicitud del cliente para cancelar un pedido ya aceptado (una por pedido).
+  cancellationRequest CancellationRequest?
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
@@ -291,6 +294,31 @@ model OrderStatusEvent {
   @@map("order_status_events")
 }
 
+enum CancellationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// El cliente pide cancelar un pedido que el comercio ya aceptó; lo resuelve el dueño en el panel.
+model CancellationRequest {
+  id         String                    @id @default(cuid())
+  orderId    String                    @unique
+  userId     String
+  reason     String
+  status     CancellationRequestStatus @default(PENDING)
+  resolvedAt DateTime?
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("cancellation_requests")
+}
+
 // ───────────── Mensajería (outbox + webhook) ─────────────
 
 enum OutboxKind {
@@ -303,6 +331,9 @@ enum OutboxKind {
   STORE_CANCELLED
   STORE_LATE_RESPONSE
   ADMIN_LATE_RESPONSE
+  ADMIN_CUSTOMER_CANCELLED
+  ADMIN_CANCEL_REQUEST
+  CUSTOMER_CANCEL_REJECTED
 }
 
 enum OutboxStatus {

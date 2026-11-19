@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { findPhoneCodes, generatePhoneCode, PHONE_CODE_TTL_MIN, samePhone } from "./phone-code";
+import { findPhoneCodes, generatePhoneCode, PHONE_CODE_TTL_MIN, samePhone, verificationText } from "./phone-code";
 
 /**
  * Guarda el número (si cambió, deja de estar verificado) y genera un código nuevo.
@@ -59,6 +59,14 @@ export async function verifyPhoneFromMessage(fromPhone: string, text: string): P
 /** El botón de simular solo existe en desarrollo. */
 export function allowPhoneSimulation() {
   return process.env.NODE_ENV === "development";
+}
+
+/** Solo desarrollo: el mismo efecto que si el usuario enviara el código desde su celular. */
+export async function simulatePhoneMessage(userId: string, code: string): Promise<boolean> {
+  if (!allowPhoneSimulation()) return false;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
+  if (!user?.phone) return false;
+  return (await verifyPhoneFromMessage(user.phone, verificationText(code))) === "verified";
 }
 
 export async function phoneVerificationStatus(userId: string) {

@@ -19,10 +19,3 @@ export function categoryLabel(value: StoreCategory) {
 export function categorySlug(value: StoreCategory) {
   return CATEGORIES.find((c) => c.value === value)?.slug ?? "";
 }
-
-const usd = new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" });
-
-/** Precios guardados en centavos de USD. */
-export function formatUsd(cents: number) {
-  return usd.format(cents / 100);
-}

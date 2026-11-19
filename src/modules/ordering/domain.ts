@@ -1,5 +1,5 @@
-import { randomInt } from "node:crypto";
 import type { OrderStatus } from "@/generated/prisma/enums";
+import { generateCode } from "@/lib/codes";
 
 /** Estados en los que el cliente todavía espera respuesta del comercio. */
 export const WAITING_STATUSES: readonly OrderStatus[] = ["PENDING", "SENT_TO_STORE"];
@@ -29,6 +29,19 @@ export function lateReplyState(status: OrderStatus): LateReplyState | null {
   return status === "EXPIRED" || status === "CANCELLED" ? status : null;
 }
 
+/**
+ * El cliente cancela al instante mientras el comercio no haya aceptado: recibido, esperando
+ * al comercio o sin respuesta. Una vez aceptado, solo puede pedirlo desde Ayuda.
+ */
+export function customerCanCancelNow(status: OrderStatus) {
+  return status === "PENDING" || status === "SENT_TO_STORE" || status === "EXPIRED";
+}
+
+/** Pedido aceptado (en preparación): la cancelación se solicita y la decide Dfly. */
+export function customerCanRequestCancel(status: OrderStatus) {
+  return status === "ACCEPTED";
+}
+
 export type PricedLine = { unitPriceCents: number; quantity: number };
 
 export function computeTotals(lines: PricedLine[], deliveryFeeCents: number) {
@@ -36,13 +49,9 @@ export function computeTotals(lines: PricedLine[], deliveryFeeCents: number) {
   return { subtotalCents, deliveryFeeCents, totalCents: subtotalCents + deliveryFeeCents };
 }
 
-// Sin caracteres ambiguos (0/O, 1/I/L) para dictarlo por teléfono sin errores.
-const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-
-export function generatePublicCode(length = 5) {
-  let code = "";
-  for (let i = 0; i < length; i++) code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
-  return code;
+/** Código corto del pedido que ve el cliente y se dicta por teléfono. */
+export function generatePublicCode() {
+  return generateCode(5);
 }
 
 /** Costo de envío fijo (centavos de USD): $2.00 por defecto, configurable por entorno. */

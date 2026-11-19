@@ -2,8 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { OutboxKind } from "@/generated/prisma/enums";
-import { transitionOrder } from "@/modules/ordering/transitions";
-import { storeCancelledMessage, type OutgoingMessage } from "./messages";
+import type { OutgoingMessage } from "./messages";
 import { getTransport } from "./transport";
 
 const MAX_ATTEMPTS = 5;
@@ -34,8 +33,20 @@ function backoffMs(attempt: number) {
   return 2 ** (attempt - 1) * 60_000; // 1, 2, 4, 8 min
 }
 
-/** Envía los mensajes pendientes. Seguro de ejecutar en paralelo (after() + cron). */
-export async function dispatchOutbox({ orderId, limit = 25 }: { orderId?: string; limit?: number } = {}) {
+export type SentMessage = { kind: OutboxKind; orderId: string };
+
+/**
+ * Lo que debe pasar en el dominio cuando un mensaje sale (p. ej. el pedido pasa a SENT_TO_STORE).
+ * Corre en la MISMA transacción que lo marca como SENT. Lo aporta quien despacha (`ordering/dispatch.ts`):
+ * este módulo es infraestructura y no conoce las reglas del pedido.
+ */
+export type OnSent = (tx: Prisma.TransactionClient, message: SentMessage) => Promise<void>;
+
+/**
+ * Envía los mensajes pendientes. Seguro de ejecutar en paralelo (after() + cron).
+ * `onSent` es obligatorio para que nadie despache sin aplicar sus efectos en el pedido.
+ */
+export async function dispatchOutbox({ orderId, limit = 25, onSent }: { orderId?: string; limit?: number; onSent: OnSent }) {
   const now = new Date();
   const due = await prisma.outboxMessage.findMany({
     where: { status: "PENDING", nextAttemptAt: { lte: now }, ...(orderId ? { orderId } : {}) },
@@ -64,10 +75,7 @@ export async function dispatchOutbox({ orderId, limit = 25 }: { orderId?: string
           where: { id: msg.id },
           data: { status: "SENT", waMessageId: id, lastError: null },
         });
-        if (msg.kind === "STORE_REQUEST") {
-          const moved = await transitionOrder(tx, msg.orderId, "PENDING", "SENT_TO_STORE", "SYSTEM");
-          if (!moved) await noticeStoreIfCancelledInFlight(tx, msg.orderId);
-        }
+        await onSent(tx, { kind: msg.kind, orderId: msg.orderId });
       });
       sent++;
     } catch (error) {
@@ -85,25 +93,4 @@ export async function dispatchOutbox({ orderId, limit = 25 }: { orderId?: string
   }
 
   return { processed: due.length, sent, failed };
-}
-
-/**
- * El admin canceló mientras el pedido al comercio ya estaba saliendo: el comercio lo recibió
- * igual, así que se le avisa que no lo prepare (una sola vez).
- */
-async function noticeStoreIfCancelledInFlight(tx: Prisma.TransactionClient, orderId: string) {
-  const order = await tx.order.findUnique({
-    where: { id: orderId },
-    select: { status: true, publicCode: true, store: { select: { name: true, whatsappPhone: true } } },
-  });
-  if (order?.status !== "CANCELLED") return;
-  const already = await tx.outboxMessage.count({ where: { orderId, kind: "STORE_CANCELLED" } });
-  if (already > 0) return;
-  await enqueue(
-    tx,
-    orderId,
-    "STORE_CANCELLED",
-    order.store.whatsappPhone,
-    storeCancelledMessage({ publicCode: order.publicCode, storeName: order.store.name }),
-  );
 }

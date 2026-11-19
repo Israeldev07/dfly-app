@@ -4,7 +4,7 @@ import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, LoaderCircle, Mail } from "lucide-react";
 import { FormError, SubmitButton } from "@/components/forms";
-import { sendEmailCodeAction, verifyEmailCodeAction, type EmailVerificationState } from "@/modules/identity/actions";
+import { sendEmailCodeAction, verifyEmailCodeAction, type EmailVerificationState } from "@/modules/identity/email-actions";
 
 /** Verificación del email con un código de 6 dígitos que llega al correo. No bloquea los pedidos. */
 export function EmailVerification({ email, verified: initialVerified }: { email: string; verified: boolean }) {

@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, CircleX, LoaderCircle, MessageCircle } from "lucide-react";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { requireUser } from "@/modules/identity/session";
-import { WAITING_STATUSES } from "@/modules/ordering/domain";
+import { OrderCancelOptions } from "@/components/order-cancel-status";
+import { customerCanCancelNow, customerCanRequestCancel, WAITING_STATUSES } from "@/modules/ordering/domain";
 import { getCustomerOrder } from "@/modules/ordering/queries";
 import { STATUS_COPY } from "@/modules/ordering/status-copy";
 import { OrderLive } from "./order-live";
@@ -110,6 +111,15 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/pe
           <span className="font-semibold text-ink">Entrega:</span> {order.deliveryAddress}
         </p>
       </section>
+
+      {customerCanCancelNow(order.status) || customerCanRequestCancel(order.status) || order.cancellationRequest ? (
+        <section aria-labelledby="cancelar" className="flex flex-col gap-3 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
+          <h2 id="cancelar" className="text-[17px] font-bold">
+            ¿Necesitas cancelarlo?
+          </h2>
+          <OrderCancelOptions code={order.publicCode} status={order.status} request={order.cancellationRequest} place="order" />
+        </section>
+      ) : null}
 
       <div className="flex flex-wrap gap-3">
         <Link href="/pedidos" className="font-semibold text-brand underline hover:text-brand-deep">

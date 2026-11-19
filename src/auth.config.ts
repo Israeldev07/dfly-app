@@ -1,7 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 
-const PROTECTED_PREFIXES = ["/comercios", "/checkout", "/pedidos", "/perfil", "/admin"];
+const PROTECTED_PREFIXES = ["/comercios", "/checkout", "/pedidos", "/perfil", "/ayuda", "/admin"];
 const AUTH_PAGES = ["/login", "/registro"];
 
 /**

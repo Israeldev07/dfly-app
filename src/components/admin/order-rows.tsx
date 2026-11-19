@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { ADMIN_STATUS, dateTime } from "@/modules/admin/copy";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { StatusLabel } from "./status";
@@ -14,6 +14,7 @@ export type OrderRow = {
   customerName: string;
   store: { name: string };
   _count: { messages: number };
+  cancellationRequest?: { status: "PENDING" | "APPROVED" | "REJECTED" } | null;
 };
 
 /** Lista de pedidos: filas de una línea en escritorio, dos líneas en celular. */
@@ -41,6 +42,12 @@ export function OrderRows({ orders }: { orders: OrderRow[] }) {
                   <span className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-brand-deep">
                     <AlertTriangle aria-hidden className="size-3.5" strokeWidth={2.25} />
                     {failed === 1 ? "1 mensaje falló" : `${failed} mensajes fallaron`}
+                  </span>
+                ) : null}
+                {o.cancellationRequest?.status === "PENDING" ? (
+                  <span className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-brand-deep">
+                    <AlertTriangle aria-hidden className="size-3.5" strokeWidth={2.25} />
+                    Pide cancelar
                   </span>
                 ) : null}
               </span>

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, LayoutDashboard, LogIn, LogOut, Package, UserPlus, UserRound } from "lucide-react";
-import { signOutAction } from "@/modules/identity/actions";
+import { ChevronDown, LayoutDashboard, LifeBuoy, LogIn, LogOut, Package, UserPlus, UserRound } from "lucide-react";
+import { signOutAction } from "@/modules/identity/auth-actions";
 
 type Props = {
   user: { name: string | null; email: string | null; isAdmin?: boolean } | null;
@@ -82,6 +82,10 @@ export function ProfileMenu({ user }: Props) {
             <Link href="/pedidos" className={itemClass}>
               <Package aria-hidden className="size-[18px] text-store" strokeWidth={1.75} />
               Mis pedidos
+            </Link>
+            <Link href="/ayuda" className={itemClass}>
+              <LifeBuoy aria-hidden className="size-[18px] text-store" strokeWidth={1.75} />
+              Ayuda
             </Link>
             {user.isAdmin ? (
               <Link href="/admin" className={itemClass}>

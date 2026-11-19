@@ -4,9 +4,16 @@ import type { OrderFilters } from "@/lib/validations/admin";
 import { stripEcuadorPrefix } from "@/lib/validations/auth";
 import { canTransition } from "@/modules/ordering/domain";
 
-/** Pedidos que piden acción del dueño: vencidos sin cancelar o con mensajes que no salieron. */
+/**
+ * Pedidos que piden acción del dueño: vencidos sin cancelar, con mensajes que no salieron
+ * o con una solicitud de cancelación del cliente sin resolver.
+ */
 export const NEEDS_ATTENTION: Prisma.OrderWhereInput = {
-  OR: [{ status: "EXPIRED" }, { messages: { some: { status: "FAILED" } }, status: { not: "CANCELLED" } }],
+  OR: [
+    { status: "EXPIRED" },
+    { messages: { some: { status: "FAILED" } }, status: { not: "CANCELLED" } },
+    { cancellationRequest: { is: { status: "PENDING" } } },
+  ],
 };
 
 const MIN_PHONE_SEARCH_DIGITS = 3;

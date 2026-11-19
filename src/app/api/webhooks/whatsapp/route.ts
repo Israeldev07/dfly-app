@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { parseActionPayload } from "@/modules/messaging/action-payload";
-import { dispatchOutbox } from "@/modules/messaging/outbox";
+import { dispatchOrderMessages } from "@/modules/ordering/dispatch";
 import { extractButtonTaps, extractTextMessages, isValidSignature } from "@/modules/messaging/webhook";
 import { verifyPhoneFromMessage } from "@/modules/identity/phone-verification";
 import { applyStoreResponse } from "@/modules/ordering/store-response";
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   if (touchedOrders.size > 0) {
     after(async () => {
-      for (const orderId of touchedOrders) await dispatchOutbox({ orderId });
+      for (const orderId of touchedOrders) await dispatchOrderMessages({ orderId });
     });
   }
   // Meta reintenta ante cualquier código distinto de 200; las ya aplicadas quedan deduplicadas.

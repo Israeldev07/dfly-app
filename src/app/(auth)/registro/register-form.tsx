@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Field, FormError, SubmitButton } from "@/components/forms";
-import { registerAction, type FormState } from "@/modules/identity/actions";
+import { registerAction, type FormState } from "@/modules/identity/auth-actions";
 
 export function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, action] = useActionState<FormState, FormData>(registerAction, {});

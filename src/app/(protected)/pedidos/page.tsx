@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { requireUser } from "@/modules/identity/session";
 import { listCustomerOrders } from "@/modules/ordering/queries";
 import { STATUS_COPY } from "@/modules/ordering/status-copy";

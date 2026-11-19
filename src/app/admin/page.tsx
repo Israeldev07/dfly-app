@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { OrderRows } from "@/components/admin/order-rows";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { getTodaySummary } from "@/modules/admin/queries";
 import { requireAdmin } from "@/modules/identity/session";
 
@@ -69,12 +69,12 @@ export default async function AdminHomePage() {
         {s.attention.length === 0 ? (
           <p className="flex items-center gap-2.5 rounded-surface bg-surface px-5 py-4 text-[15px] ring-1 ring-line">
             <CheckCircle2 aria-hidden className="size-5 flex-none text-route-deep" strokeWidth={2} />
-            Todo en orden: ningún pedido vencido ni mensajes sin enviar.
+            Todo en orden: ningún pedido vencido, mensajes sin enviar ni solicitudes de cancelación.
           </p>
         ) : (
           <>
             <p className="text-[14.5px] text-ink-soft">
-              Pedidos sin respuesta del comercio o con mensajes de WhatsApp que no salieron. Llama al comercio o reintenta el envío desde el detalle.
+              Pedidos sin respuesta del comercio, con mensajes de WhatsApp que no salieron o con una solicitud de cancelación del cliente. Resuélvelos desde el detalle.
             </p>
             <OrderRows orders={s.attention} />
           </>

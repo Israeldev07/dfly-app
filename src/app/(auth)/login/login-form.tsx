@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Field, FormError, SubmitButton } from "@/components/forms";
-import { loginAction, type FormState } from "@/modules/identity/actions";
+import { loginAction, type FormState } from "@/modules/identity/auth-actions";
 
 export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, action] = useActionState<FormState, FormData>(loginAction, {});

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { canTransition, computeTotals, generatePublicCode, lateReplyState } from "./domain";
+import {
+  canTransition,
+  computeTotals,
+  customerCanCancelNow,
+  customerCanRequestCancel,
+  generatePublicCode,
+  lateReplyState,
+} from "./domain";
 
 describe("máquina de estados del pedido", () => {
   it("permite el flujo feliz", () => {
@@ -18,6 +25,30 @@ describe("máquina de estados del pedido", () => {
     expect(canTransition("EXPIRED", "ACCEPTED")).toBe(false);
     expect(canTransition("EXPIRED", "REJECTED")).toBe(false);
     expect(canTransition("EXPIRED", "CANCELLED")).toBe(true);
+  });
+});
+
+describe("cancelación por el cliente", () => {
+  it("cancela al instante solo si el comercio aún no aceptó", () => {
+    expect(customerCanCancelNow("PENDING")).toBe(true);
+    expect(customerCanCancelNow("SENT_TO_STORE")).toBe(true);
+    expect(customerCanCancelNow("EXPIRED")).toBe(true);
+    expect(customerCanCancelNow("ACCEPTED")).toBe(false);
+    expect(customerCanCancelNow("REJECTED")).toBe(false);
+    expect(customerCanCancelNow("CANCELLED")).toBe(false);
+  });
+
+  it("con el pedido aceptado solo puede solicitarla", () => {
+    expect(customerCanRequestCancel("ACCEPTED")).toBe(true);
+    for (const s of ["PENDING", "SENT_TO_STORE", "EXPIRED", "REJECTED", "CANCELLED"] as const) {
+      expect(customerCanRequestCancel(s)).toBe(false);
+    }
+  });
+
+  it("todo lo que el cliente puede cancelar es una transición válida a CANCELLED", () => {
+    for (const s of ["PENDING", "SENT_TO_STORE", "EXPIRED", "ACCEPTED"] as const) {
+      expect(canTransition(s, "CANCELLED")).toBe(true);
+    }
   });
 });
 

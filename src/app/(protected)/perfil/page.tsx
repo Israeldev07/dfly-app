@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { EmailVerification } from "@/components/email-verification";
 import { PhoneVerification } from "@/components/phone-verification";
 import { allowPhoneSimulation } from "@/modules/identity/phone-verification";
+import { getProfile } from "@/modules/identity/queries";
 import { requireUser } from "@/modules/identity/session";
 import { ProfileForm } from "./profile-form";
 
@@ -11,11 +11,8 @@ export const metadata: Metadata = { title: "Mi perfil" };
 
 export default async function ProfilePage() {
   const user = await requireUser("/perfil");
-  const profile = await prisma.user.findUniqueOrThrow({
-    where: { id: user.id },
-    select: { name: true, email: true, emailVerified: true, phone: true, phoneVerifiedAt: true, addresses: { where: { isDefault: true }, select: { line: true, sector: true, city: true, reference: true } } },
-  });
-  const address = profile.addresses[0];
+  const profile = await getProfile(user.id);
+  const { address } = profile;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 pt-8 pb-20 sm:px-8 sm:pt-12">
@@ -31,14 +28,14 @@ export default async function ProfilePage() {
 
       <section id="email" className="flex scroll-mt-24 flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
         <h2 className="text-[17px] font-bold">Tu email</h2>
-        <EmailVerification email={profile.email} verified={Boolean(profile.emailVerified)} />
+        <EmailVerification email={profile.email} verified={profile.emailVerified} />
       </section>
 
       <section className="flex flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
         <h2 className="text-[17px] font-bold">Tu celular</h2>
         <PhoneVerification
           phone={profile.phone ?? ""}
-          verified={Boolean(profile.phone && profile.phoneVerifiedAt)}
+          verified={profile.phoneVerified}
           allowSimulate={allowPhoneSimulation()}
         />
       </section>

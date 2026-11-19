@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ExternalLink, Pencil, Plus } from "lucide-react";
 import { StoreForm } from "@/components/admin/store-form";
 import { ToggleButton } from "@/components/admin/toggle-button";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { toggleProductAvailableAction } from "@/modules/admin/actions";
 import { getAdminStore } from "@/modules/admin/queries";
 import { requireAdmin } from "@/modules/identity/session";

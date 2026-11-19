@@ -47,6 +47,9 @@ export const TEMPLATES = {
   storeCancelled: "pedido_cancelado_comercio",
   storeLate: "pedido_vencido_comercio",
   adminLate: "respuesta_tardia_admin",
+  adminCustomerCancelled: "pedido_cancelado_por_cliente_admin",
+  adminCancelRequest: "solicitud_cancelacion_admin",
+  customerCancelRejected: "cancelacion_rechazada_cliente",
 } as const;
 
 const LANG = "es";
@@ -181,6 +184,45 @@ export function storeLateResponseMessage(
     language: LANG,
     bodyParams: params,
     preview: `Pedido #${params[0]} de Dfly para ${params[1]} ya está ${params[2]}: NO lo prepares. Si pulsas Aceptar o Rechazar, no se registrará. Dfly te contactará si hace falta.`,
+  };
+}
+
+/** Al dueño: el cliente canceló antes de que el comercio aceptara. */
+export function adminCustomerCancelledMessage(publicCode: string, storeName: string): OutgoingMessage {
+  const params = [publicCode, storeName].map(toParam);
+  return {
+    template: TEMPLATES.adminCustomerCancelled,
+    language: LANG,
+    bodyParams: params,
+    preview: `Pedido #${params[0]} (${params[1]}): el cliente lo canceló antes de que el comercio lo aceptara.`,
+  };
+}
+
+/** Al dueño: el cliente pide cancelar un pedido ya aceptado; se resuelve en el panel. */
+export function adminCancelRequestMessage(
+  publicCode: string,
+  storeName: string,
+  customerName: string,
+  reason: string,
+): OutgoingMessage {
+  // Sin punto final: la plantilla ya sigue con ". Revísalo en el panel".
+  const params = [publicCode, storeName, customerName, reason.trim().replace(/[.\s]+$/, "")].map(toParam);
+  return {
+    template: TEMPLATES.adminCancelRequest,
+    language: LANG,
+    bodyParams: params,
+    preview: `Pedido #${params[0]} (${params[1]}): ${params[2]} pide cancelarlo. Motivo: ${params[3]}. Revísalo en el panel.`,
+  };
+}
+
+/** Al cliente: Dfly no aprobó cancelar su pedido ya aceptado. */
+export function customerCancelRejectedMessage(publicCode: string, customerFirstName: string, storeName: string): OutgoingMessage {
+  const params = [customerFirstName, publicCode, storeName].map(toParam);
+  return {
+    template: TEMPLATES.customerCancelRejected,
+    language: LANG,
+    bodyParams: params,
+    preview: `Hola ${params[0]}, no pudimos cancelar tu pedido #${params[1]} en ${params[2]}: el comercio ya lo está preparando. Escríbenos si tienes dudas.`,
   };
 }
 

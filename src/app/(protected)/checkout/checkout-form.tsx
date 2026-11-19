@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { Banknote, Landmark, ShieldCheck } from "lucide-react";
 import { Field, FormError, SubmitButton } from "@/components/forms";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { createOrderAction, quoteCartAction, type CheckoutState } from "@/modules/ordering/actions";
 import type { CartChange, CartQuote } from "@/modules/ordering/cart-sync";
 import { cartSummary, useCart, useCartHydrated } from "@/modules/ordering/cart-store";

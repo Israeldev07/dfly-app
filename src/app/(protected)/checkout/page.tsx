@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail } from "lucide-react";
-import { prisma } from "@/lib/db";
 import { PhoneVerification } from "@/components/phone-verification";
 import { allowPhoneSimulation } from "@/modules/identity/phone-verification";
+import { getCheckoutProfile } from "@/modules/identity/queries";
 import { requireUser } from "@/modules/identity/session";
 import { deliveryFeeCents } from "@/modules/ordering/domain";
 import { CheckoutForm } from "./checkout-form";
@@ -12,14 +12,7 @@ export const metadata: Metadata = { title: "Confirmar pedido" };
 
 export default async function CheckoutPage() {
   const user = await requireUser("/checkout");
-  const [profile, address] = await Promise.all([
-    prisma.user.findUnique({ where: { id: user.id }, select: { phone: true, phoneVerifiedAt: true, emailVerified: true } }),
-    prisma.address.findFirst({
-      where: { userId: user.id, isDefault: true },
-      select: { line: true, sector: true, reference: true },
-    }),
-  ]);
-  const phoneVerified = Boolean(profile?.phone && profile.phoneVerifiedAt);
+  const { phone, phoneVerified, emailVerified, address } = await getCheckoutProfile(user.id);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 pt-8 pb-20 sm:px-8 sm:pt-12">
@@ -40,12 +33,12 @@ export default async function CheckoutPage() {
             )}
           </div>
           <PhoneVerification
-            phone={profile?.phone ?? ""}
+            phone={phone ?? ""}
             verified={phoneVerified}
             allowSimulate={allowPhoneSimulation()}
           />
         </section>
-        {profile?.emailVerified ? null : (
+        {emailVerified ? null : (
           <p className="flex items-start gap-2 text-[14px] text-ink-soft lg:col-start-1">
             <Mail aria-hidden className="mt-px size-4 flex-none text-store" strokeWidth={2} />
             <span>

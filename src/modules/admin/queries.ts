@@ -48,6 +48,7 @@ const attentionSelect = {
   customerName: true,
   store: { select: { name: true } },
   _count: { select: { messages: { where: { status: "FAILED" } } } },
+  cancellationRequest: { select: { status: true } },
 } satisfies Prisma.OrderSelect;
 
 export async function listAdminOrders(filters: OrderFilters) {
@@ -86,6 +87,7 @@ export function getAdminOrder(publicCode: string) {
       respondedAt: true,
       user: { select: { email: true } },
       store: { select: { id: true, name: true, sector: true } },
+      cancellationRequest: { select: { reason: true, status: true, createdAt: true, resolvedAt: true } },
       items: { select: { id: true, nameSnapshot: true, optionsSummary: true, unitPriceCents: true, quantity: true } },
       events: { orderBy: { createdAt: "asc" }, select: { id: true, from: true, to: true, actor: true, createdAt: true } },
       messages: {

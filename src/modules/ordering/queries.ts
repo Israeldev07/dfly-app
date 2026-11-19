@@ -18,6 +18,24 @@ export function getCustomerOrder(publicCode: string, userId: string) {
       respondedAt: true,
       store: { select: { name: true, slug: true } },
       items: { select: { id: true, nameSnapshot: true, optionsSummary: true, unitPriceCents: true, quantity: true } },
+      cancellationRequest: { select: { status: true, createdAt: true } },
+    },
+  });
+}
+
+/** Pedidos recientes del cliente para "Problemas con un pedido" en Ayuda. */
+export function listHelpOrders(userId: string) {
+  return prisma.order.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: {
+      publicCode: true,
+      status: true,
+      totalCents: true,
+      createdAt: true,
+      store: { select: { name: true } },
+      cancellationRequest: { select: { status: true } },
     },
   });
 }

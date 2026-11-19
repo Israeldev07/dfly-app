@@ -8,12 +8,13 @@ import { Prisma } from "@/generated/prisma/client";
 import { cartQuoteSchema, checkoutSchema } from "@/lib/validations/checkout";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { retryAfterLabel } from "@/lib/rate-limit-rules";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { priceSelection, type ProductWithOptions } from "@/modules/catalog/options";
 import { optionGroupsSelect } from "@/modules/catalog/queries";
 import { adminNewOrderMessage, sanitizeStoreNotes, storeRequestMessage } from "@/modules/messaging/messages";
 import { buildActionPayload } from "@/modules/messaging/action-payload";
-import { adminPhone, dispatchOutbox, enqueue } from "@/modules/messaging/outbox";
+import { adminPhone, enqueue } from "@/modules/messaging/outbox";
+import { dispatchOrderMessages } from "./dispatch";
 import type { CartQuote } from "./cart-sync";
 import { computeTotals, deliveryFeeCents, generatePublicCode } from "./domain";
 
@@ -208,7 +209,7 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
   if (!order) return { error: "No pudimos registrar tu pedido. Inténtalo de nuevo.", values };
 
   const orderId = order.id;
-  after(() => dispatchOutbox({ orderId }));
+  after(() => dispatchOrderMessages({ orderId }));
   redirect(`/pedidos/${order.publicCode}?nuevo=1`);
 }
 

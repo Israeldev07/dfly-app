@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { cartSummary, useCart, useCartHydrated } from "@/modules/ordering/cart-store";
 
 /** Barra fija inferior con el resumen del carrito. Sale desde abajo cuando hay productos. */

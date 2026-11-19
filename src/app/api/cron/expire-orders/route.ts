@@ -1,6 +1,6 @@
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { pruneRateLimits } from "@/lib/rate-limit";
-import { dispatchOutbox } from "@/modules/messaging/outbox";
+import { dispatchOrderMessages } from "@/modules/ordering/dispatch";
 import { expireStaleOrders } from "@/modules/ordering/store-response";
 
 /**
@@ -10,7 +10,7 @@ import { expireStaleOrders } from "@/modules/ordering/store-response";
 export async function GET(request: Request) {
   if (!isAuthorizedCron(request)) return new Response("Unauthorized", { status: 401 });
   const result = await expireStaleOrders();
-  if (result.expired > 0) await dispatchOutbox({ limit: 50 });
+  if (result.expired > 0) await dispatchOrderMessages({ limit: 50 });
   const prunedRateLimits = await pruneRateLimits();
   return Response.json({ ...result, prunedRateLimits });
 }

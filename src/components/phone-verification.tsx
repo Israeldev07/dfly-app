@@ -9,7 +9,7 @@ import {
   simulatePhoneVerificationAction,
   startPhoneVerificationAction,
   type PhoneVerificationState,
-} from "@/modules/identity/actions";
+} from "@/modules/identity/phone-actions";
 
 type Props = {
   /** Celular guardado en formato local ("0991234567") o vacío. */

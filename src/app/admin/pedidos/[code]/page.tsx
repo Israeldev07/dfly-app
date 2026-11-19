@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MessageCircle, Phone } from "lucide-react";
-import { CancelOrder, RetryMessage } from "@/components/admin/order-actions";
+import { CancelOrder, RejectCancelRequest, RetryMessage } from "@/components/admin/order-actions";
 import { StatusLabel } from "@/components/admin/status";
-import { formatUsd } from "@/modules/catalog/categories";
+import { formatUsd } from "@/lib/money";
 import { ACTOR, ADMIN_STATUS, MESSAGE_KIND, MESSAGE_STATUS, PAYMENT, dateTime, timeOnly } from "@/modules/admin/copy";
 import { canAdminCancel, canRetryMessage } from "@/modules/admin/domain";
 import { getAdminOrder } from "@/modules/admin/queries";
@@ -28,6 +28,8 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/pedid
   const status = ADMIN_STATUS[order.status];
   const storeWasContacted = order.messages.some((m) => m.kind === "STORE_REQUEST" && m.status === "SENT");
   const phoneDigits = order.customerPhone.replace(/\D/g, "");
+  const request = order.cancellationRequest;
+  const requestPending = request?.status === "PENDING";
 
   return (
     <main className="flex flex-col gap-6">
@@ -176,9 +178,27 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/pedid
               <p className="tabular text-[15px]">{dateTime.format(order.respondedAt)}</p>
             </div>
           ) : null}
+          {request ? (
+            <div className="flex flex-col gap-3 border-t border-line pt-5">
+              <h2 className="text-[13px] font-medium text-ink-soft">Solicitud de cancelación del cliente</h2>
+              <p className="rounded-control bg-muted px-4 py-3 text-[14.5px] leading-snug break-words">
+                <span className="font-semibold">Motivo:</span> {request.reason}
+              </p>
+              <p className="tabular text-[13.5px] text-ink-soft">
+                {dateTime.format(request.createdAt)}
+                {request.status === "APPROVED" ? " · Aprobada (pedido cancelado)" : ""}
+                {request.status === "REJECTED" ? " · Rechazada: el pedido sigue en curso" : ""}
+              </p>
+            </div>
+          ) : null}
           {canAdminCancel(order.status) ? (
-            <div className="border-t border-line pt-5">
-              <CancelOrder orderId={order.id} storeWillBeNotified={storeWasContacted} />
+            <div className="flex flex-col gap-2 border-t border-line pt-5">
+              <CancelOrder
+                orderId={order.id}
+                storeWillBeNotified={storeWasContacted}
+                label={requestPending ? "Aprobar y cancelar pedido" : "Cancelar pedido"}
+              />
+              {requestPending ? <RejectCancelRequest orderId={order.id} /> : null}
             </div>
           ) : null}
         </aside>

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminCancelRequestMessage,
+  adminCustomerCancelledMessage,
+  customerCancelRejectedMessage,
   adminLateResponseMessage,
   adminNewOrderMessage,
   customerCancelledMessage,
@@ -87,6 +90,26 @@ describe("avisos de respuesta tardía", () => {
     expect(adminLateResponseMessage("A7K3P", "Fritadas El Lago", false, "CANCELLED").bodyParams.slice(2)).toEqual([
       "RECHAZAR",
       "cancelado",
+    ]);
+  });
+});
+
+describe("cancelación por el cliente", () => {
+  it("el dueño recibe el código, el comercio, el cliente y el motivo saneado", () => {
+    const msg = adminCancelRequestMessage("A7K3P", "Fritadas El Lago", "María Cachimuel", "Me equivoqué\nde dirección.");
+    expect(msg.bodyParams).toEqual(["A7K3P", "Fritadas El Lago", "María Cachimuel", "Me equivoqué / de dirección"]);
+    expect(msg.preview).not.toContain("..");
+  });
+
+  it("aviso al dueño cuando el cliente cancela al instante", () => {
+    expect(adminCustomerCancelledMessage("A7K3P", "Fritadas El Lago").bodyParams).toEqual(["A7K3P", "Fritadas El Lago"]);
+  });
+
+  it("el cliente sabe que su solicitud no se aprobó", () => {
+    expect(customerCancelRejectedMessage("A7K3P", "María", "Fritadas El Lago").bodyParams).toEqual([
+      "María",
+      "A7K3P",
+      "Fritadas El Lago",
     ]);
   });
 });

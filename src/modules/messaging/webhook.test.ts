@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { extractButtonTaps, extractTextMessages, isValidSignature } from "./webhook";
+import { extractButtonTaps, isValidSignature } from "./webhook";
 
 // Estructura real documentada por Meta para un toque en botón quick reply.
 const body = {
@@ -62,32 +62,5 @@ describe("isValidSignature", () => {
     expect(isValidSignature(raw, null, "app-secret")).toBe(false);
     expect(isValidSignature(raw, good, "otro")).toBe(false);
     expect(isValidSignature(raw.replace("Aceptar", "Rechazar"), good, "app-secret")).toBe(false);
-  });
-});
-
-describe("extractTextMessages", () => {
-  const textBody = (phoneNumberId: string) => ({
-    entry: [
-      {
-        changes: [
-          {
-            value: {
-              metadata: { phone_number_id: phoneNumberId },
-              messages: [
-                { id: "wamid.T1", from: "593991234567", type: "text", text: { body: "Verificar Dfly: K7P4QX" } },
-                { id: "wamid.B1", from: "593991234567", type: "button", button: { payload: "x" } },
-              ],
-            },
-          },
-        ],
-      },
-    ],
-  });
-
-  it("extrae solo los mensajes de texto dirigidos a nuestro número", () => {
-    expect(extractTextMessages(textBody("PN1"), "PN1")).toEqual([
-      { messageId: "wamid.T1", from: "593991234567", text: "Verificar Dfly: K7P4QX" },
-    ]);
-    expect(extractTextMessages(textBody("OTRO"), "PN1")).toEqual([]);
   });
 });

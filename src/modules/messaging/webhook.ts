@@ -51,15 +51,3 @@ export function extractButtonTaps(body: unknown, phoneNumberId: string | undefin
   }
   return taps;
 }
-
-export type TextMessage = { messageId: string; from: string; text: string };
-
-/** Mensajes de texto entrantes (p. ej. el código con el que un cliente verifica su celular). */
-export function extractTextMessages(body: unknown, phoneNumberId: string | undefined): TextMessage[] {
-  const texts: TextMessage[] = [];
-  for (const msg of inboundMessages(body, phoneNumberId)) {
-    const text = msg.type === "text" ? msg.text?.body : undefined;
-    if (msg.id && msg.from && text) texts.push({ messageId: msg.id, from: msg.from, text: text.slice(0, 500) });
-  }
-  return texts;
-}

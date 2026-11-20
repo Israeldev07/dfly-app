@@ -52,10 +52,18 @@ describe("reglas del panel", () => {
   });
 
   it("el pedido al comercio solo se reintenta si el pedido sigue pendiente", () => {
-    expect(canRetryMessage("STORE_REQUEST", "FAILED", "PENDING")).toBe(true);
-    expect(canRetryMessage("STORE_REQUEST", "FAILED", "CANCELLED")).toBe(false);
-    expect(canRetryMessage("CUSTOMER_RESULT", "FAILED", "ACCEPTED")).toBe(true);
-    expect(canRetryMessage("CUSTOMER_RESULT", "SENT", "ACCEPTED")).toBe(false);
+    expect(canRetryMessage("STORE_REQUEST", "FAILED", "PENDING", 0)).toBe(true);
+    expect(canRetryMessage("STORE_REQUEST", "FAILED", "CANCELLED", 0)).toBe(false);
+    expect(canRetryMessage("CUSTOMER_RESULT", "FAILED", "ACCEPTED", 0)).toBe(true);
+    expect(canRetryMessage("CUSTOMER_RESULT", "SENT", "ACCEPTED", 0)).toBe(false);
+  });
+
+  it("en un pedido largo reintenta solo la continuación mientras el pedido siga en curso", () => {
+    expect(canRetryMessage("STORE_REQUEST", "FAILED", "SENT_TO_STORE", 1)).toBe(true);
+    expect(canRetryMessage("STORE_REQUEST", "FAILED", "ACCEPTED", 2)).toBe(true);
+    expect(canRetryMessage("STORE_REQUEST", "FAILED", "SENT_TO_STORE", 0)).toBe(false);
+    expect(canRetryMessage("STORE_REQUEST", "FAILED", "EXPIRED", 1)).toBe(false);
+    expect(canRetryMessage("STORE_REQUEST", "FAILED", "CANCELLED", 1)).toBe(false);
   });
 });
 

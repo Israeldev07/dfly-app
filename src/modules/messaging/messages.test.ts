@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  authCodeMessage,
   adminCancelRequestMessage,
   adminCustomerCancelledMessage,
   customerCancelRejectedMessage,
   adminLateResponseMessage,
   adminNewOrderMessage,
   customerCancelledMessage,
+  exceedsMaxParts,
+  messageParts,
+  packLines,
+  TEMPLATE_BODY_LIMIT,
+  TEMPLATE_FIXED_TEXT_MAX,
   sanitizeStoreNotes,
   storeCancelledMessage,
   storeLateResponseMessage,
@@ -131,5 +137,95 @@ describe("avisos de cancelación", () => {
       "A7K3P",
       "Fritadas El Lago",
     ]);
+  });
+});
+
+describe("pedidos largos en varios mensajes", () => {
+  const BUDGET = TEMPLATE_BODY_LIMIT - TEMPLATE_FIXED_TEXT_MAX;
+  const payloads = { accept: "acc", reject: "rej" };
+  const bigItems = Array.from({ length: 40 }, (_, i) => ({
+    name: `Producto número ${i + 1} con nombre bastante largo para la prueba`,
+    quantity: 2,
+    options: "Acompañante: Yuca · Agrega: Arroz, Huevo frito",
+  }));
+  const big: AdminOrderView = {
+    ...order,
+    items: bigItems,
+    storeNotes: "x".repeat(300),
+    customerName: `${"cliente".repeat(30)}@correo.com`,
+    deliveryAddress: `${"a".repeat(160)}, ${"b".repeat(60)}, Otavalo (Ref: ${"c".repeat(160)})`,
+  };
+  const allText = (msg: ReturnType<typeof storeRequestMessage>) =>
+    messageParts(msg).flatMap((p) => p.bodyParams).join(" ");
+
+  it("un pedido normal sigue siendo un solo mensaje", () => {
+    expect(storeRequestMessage(order, payloads).continuation).toBeUndefined();
+    expect(adminNewOrderMessage(order).continuation).toBeUndefined();
+  });
+
+  it("ningún mensaje supera el límite de Meta y no se pierde ningún producto", () => {
+    for (const msg of [storeRequestMessage(big, payloads), adminNewOrderMessage(big)]) {
+      const parts = messageParts(msg);
+      expect(parts.length).toBeGreaterThan(1);
+      for (const part of parts) {
+        expect(part.bodyParams.reduce((n, p) => n + p.length, 0)).toBeLessThanOrEqual(BUDGET);
+      }
+      for (const item of bigItems) expect(allText(msg)).toContain(`2 x ${item.name}`);
+    }
+  });
+
+  it("los botones van solo en el primer mensaje y las partes están numeradas", () => {
+    const [first, ...rest] = messageParts(storeRequestMessage(big, payloads));
+    expect(first.quickReplies).toEqual(["acc", "rej"]);
+    expect(first.bodyParams[1]).toMatch(/\(sigue en el próximo mensaje\)$/);
+    rest.forEach((part, k) => {
+      expect(part.template).toBe("pedido_detalle_parte");
+      expect(part.quickReplies).toBeUndefined();
+      expect(part.bodyParams[0]).toBe("A7K3P");
+      expect(part.bodyParams[1]).toBe(`${k + 2}/${rest.length + 1}`);
+    });
+  });
+
+  it("al dueño le llegan completas la dirección y las indicaciones aunque no quepan en el principal", () => {
+    const msg = adminNewOrderMessage(big);
+    expect(msg.bodyParams[5]).toBe(big.customerName);
+    expect(allText(msg)).toContain(big.deliveryAddress);
+    expect(allText(msg)).toContain("x".repeat(300));
+  });
+
+  it("las continuaciones al comercio tampoco llevan datos del cliente", () => {
+    const text = allText(storeRequestMessage(big, payloads));
+    expect(text).not.toContain("cliente");
+    expect(text).not.toContain("Otavalo");
+    expect(text).not.toContain("+593");
+  });
+
+  it("un pedido enorme excede las continuaciones admitidas", () => {
+    const huge = { ...big, items: bigItems.map((i) => ({ ...i, options: "Extra: ".concat("queso ".repeat(150)) })) };
+    expect(exceedsMaxParts(storeRequestMessage(huge, payloads))).toBe(true);
+    expect(exceedsMaxParts(storeRequestMessage(big, payloads))).toBe(false);
+  });
+});
+
+describe("packLines", () => {
+  it("agrupa líneas sin pasarse del presupuesto", () => {
+    expect(packLines(["aaa", "bbb", "ccc"], 8, 8)).toEqual(["aaa, bbb", "ccc"]);
+  });
+
+  it("corta una línea demasiado larga en un espacio sin perder texto", () => {
+    const line = "uno dos tres cuatro cinco seis";
+    const chunks = packLines([line], 10, 10);
+    for (const c of chunks) expect(c.length).toBeLessThanOrEqual(10);
+    expect(chunks.join(" ")).toBe(line);
+  });
+});
+
+describe("código de verificación del celular", () => {
+  it("usa la plantilla de autenticación con el código en el cuerpo y en el botón", () => {
+    const m = authCodeMessage("482913");
+    expect(m.template).toBe("codigo_verificacion");
+    expect(m.bodyParams).toEqual(["482913"]);
+    expect(m.otpCode).toBe("482913");
+    expect(m.quickReplies).toBeUndefined();
   });
 });

@@ -141,6 +141,11 @@ export async function expireStaleOrders() {
     const changed = await prisma.$transaction(async (tx) => {
       const ok = await transitionOrder(tx, order.id, "SENT_TO_STORE", "EXPIRED", "SYSTEM");
       if (ok) {
+        // Si el pedido iba en varios mensajes y alguno no salió, ya no tiene sentido mandarlo.
+        await tx.outboxMessage.updateMany({
+          where: { orderId: order.id, kind: "STORE_REQUEST", status: { in: ["PENDING", "FAILED"] } },
+          data: { status: "SKIPPED", lastError: "Pedido vencido antes de enviarse por completo" },
+        });
         await enqueue(tx, order.id, "ADMIN_EXPIRED", adminPhone(), adminExpiredMessage(order.publicCode, order.store.name, minutes));
         await enqueue(
           tx,

@@ -9,6 +9,7 @@ import { clientIp, RATE_LIMITED_CODE, retryAfterLabel } from "@/lib/rate-limit-r
 import { safeCallbackUrl } from "@/lib/safe-callback";
 import { loginSchema, registerSchema } from "@/lib/validations/auth";
 import { createCredentialsUser } from "./accounts";
+import { sendEmailCode } from "./email-verification";
 import { fieldErrorsFrom } from "./form-errors";
 
 export type FormState = {
@@ -55,22 +56,28 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
     return { error: `Demasiados registros desde esta conexión. Inténtalo en ${retryAfterLabel(limit.retryAfterSec)}.`, values };
   }
 
-  if ((await createCredentialsUser({ name, email, phone, password })) === "email-taken") {
+  const created = await createCredentialsUser({ name, email, phone, password });
+  if (created === "email-taken") {
     return { fieldErrors: { email: "Ya existe una cuenta con este correo. Inicia sesión." }, values };
   }
 
+  // El código del correo sale ya; si falla, la página de verificación permite pedir otro.
   try {
-    await signIn("credentials", { email, password, redirectTo: redirectTarget(formData) });
+    await sendEmailCode(created.id);
+  } catch (error) {
+    console.error("[email] no se pudo enviar el código del registro", error);
+  }
+
+  // Tras registrarse, se verifica una sola vez el correo y el celular; luego sigue a donde iba.
+  const next = redirectTarget(formData);
+  try {
+    await signIn("credentials", { email, password, redirectTo: `/verificar?callbackUrl=${encodeURIComponent(next)}` });
   } catch (error) {
     // La cuenta ya existe; si el login automático falla (p. ej. rate limit), que entre a mano.
     if (error instanceof AuthError) redirect("/login");
     throw error; // redirect de éxito
   }
   return {};
-}
-
-export async function googleSignInAction(formData: FormData) {
-  await signIn("google", { redirectTo: redirectTarget(formData) });
 }
 
 export async function signOutAction() {

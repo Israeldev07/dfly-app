@@ -1,8 +1,7 @@
 import { after } from "next/server";
 import { parseActionPayload } from "@/modules/messaging/action-payload";
 import { dispatchOrderMessages } from "@/modules/ordering/dispatch";
-import { extractButtonTaps, extractTextMessages, isValidSignature } from "@/modules/messaging/webhook";
-import { verifyPhoneFromMessage } from "@/modules/identity/phone-verification";
+import { extractButtonTaps, isValidSignature } from "@/modules/messaging/webhook";
 import { applyStoreResponse, StoreReplyTooEarlyError } from "@/modules/ordering/store-response";
 
 /** Verificación del webhook que hace Meta al configurarlo. */
@@ -58,16 +57,6 @@ export async function POST(request: Request) {
       } else {
         console.error(`[webhook] error al aplicar ${action.action} al pedido ${action.orderId}`, error);
       }
-      failed = true;
-    }
-  }
-
-  for (const message of extractTextMessages(body, process.env.WHATSAPP_PHONE_NUMBER_ID)) {
-    try {
-      const result = await verifyPhoneFromMessage(message.from, message.text);
-      if (result === "verified") console.info(`[webhook] celular verificado (mensaje ${message.messageId})`);
-    } catch (error) {
-      console.error(`[webhook] error al verificar celular (mensaje ${message.messageId})`, error);
       failed = true;
     }
   }

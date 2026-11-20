@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { EmailVerification } from "@/components/email-verification";
 import { PhoneVerification } from "@/components/phone-verification";
-import { allowPhoneSimulation } from "@/modules/identity/phone-verification";
 import { getProfile } from "@/modules/identity/queries";
 import { requireUser } from "@/modules/identity/session";
 import { ProfileForm } from "./profile-form";
@@ -26,18 +25,14 @@ export default async function ProfilePage() {
         <ProfileForm name={profile.name ?? ""} />
       </section>
 
-      <section id="email" className="flex scroll-mt-24 flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
-        <h2 className="text-[17px] font-bold">Tu email</h2>
+      <section className="flex flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
+        <h2 className="text-[17px] font-bold">Tu correo</h2>
         <EmailVerification email={profile.email} verified={profile.emailVerified} />
       </section>
 
       <section className="flex flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
         <h2 className="text-[17px] font-bold">Tu celular</h2>
-        <PhoneVerification
-          phone={profile.phone ?? ""}
-          verified={profile.phoneVerified}
-          allowSimulate={allowPhoneSimulation()}
-        />
+        <PhoneVerification phone={profile.phone ?? ""} verified={profile.phoneVerified} pendingPhone={profile.pendingPhone} />
       </section>
 
       <section className="flex flex-col gap-2 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">

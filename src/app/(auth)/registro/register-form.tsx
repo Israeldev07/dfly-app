@@ -42,7 +42,7 @@ export function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
         required
         defaultValue={state.values?.phone}
         error={state.fieldErrors?.phone}
-        hint="Aquí te confirmamos cada pedido. El comercio nunca ve tu número."
+        hint="Te enviaremos un código por WhatsApp para confirmarlo. El comercio nunca ve tu número."
       />
       <Field
         label="Contraseña"

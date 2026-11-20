@@ -11,7 +11,12 @@ import { retryAfterLabel } from "@/lib/rate-limit-rules";
 import { formatUsd } from "@/lib/money";
 import { priceSelection, type ProductWithOptions } from "@/modules/catalog/options";
 import { optionGroupsSelect } from "@/modules/catalog/queries";
-import { adminNewOrderMessage, sanitizeStoreNotes, storeRequestMessage } from "@/modules/messaging/messages";
+import {
+  adminNewOrderMessage,
+  exceedsMaxParts,
+  sanitizeStoreNotes,
+  storeRequestMessage,
+} from "@/modules/messaging/messages";
 import { buildActionPayload } from "@/modules/messaging/action-payload";
 import { adminPhone, enqueue } from "@/modules/messaging/outbox";
 import { dispatchOrderMessages } from "./dispatch";
@@ -74,8 +79,18 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
   // Solo se escribe por WhatsApp a un celular que el cliente verificó; nunca al que escriba en el formulario.
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { name: true, email: true, phone: true, phoneVerifiedAt: true },
+    select: {
+      name: true,
+      email: true,
+      phone: true,
+      phoneVerifiedAt: true,
+      emailVerified: true,
+    },
   });
+  // La cuenta se verifica una sola vez, tras registrarse: el correo y el celular, cada uno con su código.
+  if (!user.emailVerified) {
+    return { error: "Verifica tu correo antes de hacer tu pedido.", values };
+  }
   if (!user.phone || !user.phoneVerifiedAt) {
     return { error: "Verifica tu celular por WhatsApp antes de hacer tu pedido.", values };
   }
@@ -134,16 +149,43 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
     };
   }
 
+  const customerName = user.name?.trim() || user.email;
+  const deliveryAddress = [input.addressLine, input.sector, store.city].join(", ") +
+    (input.reference ? ` (Ref: ${input.reference})` : "");
+  const storeNotes = sanitizeStoreNotes(input.notes);
+  const items = lines.map((l) => ({ name: l.nameSnapshot, options: l.optionsSummary, quantity: l.quantity }));
+  const buildMessages = (publicCode: string, orderId: string) => ({
+    admin: adminNewOrderMessage({
+      publicCode,
+      storeName: store.name,
+      items,
+      storeNotes: input.notes,
+      customerName,
+      customerPhone,
+      deliveryAddress,
+      paymentMethod: input.paymentMethod,
+      totalLabel: formatUsd(totals.totalCents),
+    }),
+    store: storeRequestMessage(
+      { publicCode, storeName: store.name, items, storeNotes },
+      { accept: buildActionPayload(orderId, "accept"), reject: buildActionPayload(orderId, "reject") },
+    ),
+  });
+
+  // Antes de crear nada: un código de muestra tiene el mismo largo y los botones no cuentan en el texto.
+  const sample = buildMessages(generatePublicCode(), "muestra");
+  if (exceedsMaxParts(sample.admin) || exceedsMaxParts(sample.store)) {
+    return {
+      error: "Tu pedido es demasiado largo para enviarlo al comercio. Divídelo en dos pedidos o acorta las indicaciones.",
+      values,
+    };
+  }
+
   // Solo cuenta pedidos válidos: corregir el carrito no gasta cupo.
   const limit = await consumeRateLimit("order:user", userId);
   if (!limit.ok) {
     return { error: `Hiciste varios pedidos seguidos. Podrás hacer otro en ${retryAfterLabel(limit.retryAfterSec)}.`, values };
   }
-
-  const customerName = user.name?.trim() || user.email;
-  const deliveryAddress = [input.addressLine, input.sector, store.city].join(", ") +
-    (input.reference ? ` (Ref: ${input.reference})` : "");
-  const storeNotes = sanitizeStoreNotes(input.notes);
 
   let order: { id: string; publicCode: string } | null = null;
   for (let attempt = 0; attempt < 3 && !order; attempt++) {
@@ -170,34 +212,9 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
 
         await saveDefaultAddress(tx, userId, input.addressLine, input.sector, store.city, input.reference);
 
-        const items = lines.map((l) => ({ name: l.nameSnapshot, options: l.optionsSummary, quantity: l.quantity }));
-        await enqueue(
-          tx,
-          created.id,
-          "ADMIN_NEW_ORDER",
-          adminPhone(),
-          adminNewOrderMessage({
-            publicCode,
-            storeName: store.name,
-            items,
-            storeNotes: input.notes,
-            customerName,
-            customerPhone,
-            deliveryAddress,
-            paymentMethod: input.paymentMethod,
-            totalLabel: formatUsd(totals.totalCents),
-          }),
-        );
-        await enqueue(
-          tx,
-          created.id,
-          "STORE_REQUEST",
-          store.whatsappPhone,
-          storeRequestMessage(
-            { publicCode, storeName: store.name, items, storeNotes },
-            { accept: buildActionPayload(created.id, "accept"), reject: buildActionPayload(created.id, "reject") },
-          ),
-        );
+        const messages = buildMessages(publicCode, created.id);
+        await enqueue(tx, created.id, "ADMIN_NEW_ORDER", adminPhone(), messages.admin);
+        await enqueue(tx, created.id, "STORE_REQUEST", store.whatsappPhone, messages.store);
         return created;
       });
     } catch (error) {

@@ -7,27 +7,37 @@ import { loginSchema } from "@/lib/validations/auth";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { clientIp, RATE_LIMITED_CODE } from "@/lib/rate-limit-rules";
 import authConfig from "@/auth.config";
+import { isSessionActive } from "@/modules/identity/session-validity";
 
 class RateLimitedSignin extends CredentialsSignin {
   code = RATE_LIMITED_CODE;
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+/**
+ * Hash bcrypt (coste 12) de una contraseña al azar. Se compara contra él cuando el email no existe,
+ * para que la respuesta tarde lo mismo y no revele qué correos tienen cuenta.
+ */
+const DUMMY_HASH = "$2b$12$fX3QyIO6r89L.n6vXcTIbORMdvBPkxaWKyhQ52K0ZCSosX8UCCtlS";
+
+const nextAuth = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
-  events: {
-    // Google ya verificó el email: no hace falta pedir código a esas cuentas.
-    async signIn({ user, account, profile }) {
-      if (account?.provider !== "google" || profile?.email_verified !== true || !user.id) return;
-      await prisma.user.updateMany({ where: { id: user.id, emailVerified: null }, data: { emailVerified: new Date() } });
+  callbacks: {
+    ...authConfig.callbacks,
+    // Fuera del proxy, cada `auth()` comprueba que la cuenta siga existiendo y no haya anulado la sesión.
+    async jwt(params) {
+      const token = await authConfig.callbacks.jwt(params);
+      if (params.user) return token;
+      return token.id && (await isSessionActive(token.id, token.authAt)) ? token : null;
     },
   },
   providers: [
-    ...authConfig.providers,
     Credentials({
       credentials: { email: {}, password: {} },
       async authorize(raw, request) {
+        // Antes de leer la contraseña: si se restablece mientras tanto, esta sesión queda anulada.
+        const startedAt = Date.now();
         const parsed = loginSchema.safeParse(raw);
         if (!parsed.success) return null;
 
@@ -40,14 +50,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { email: parsed.data.email },
           select: { id: true, name: true, email: true, image: true, role: true, password: true },
         });
-        // Mismo resultado para email inexistente y contraseña incorrecta.
-        if (!user?.password) return null;
-        const valid = await bcrypt.compare(parsed.data.password, user.password);
-        if (!valid) return null;
+        // Siempre un bcrypt, exista o no la cuenta; mismo resultado para email inexistente y contraseña incorrecta.
+        const valid = await bcrypt.compare(parsed.data.password, user?.password ?? DUMMY_HASH);
+        if (!user?.password || !valid) return null;
 
         const { password: _password, ...safeUser } = user;
-        return safeUser;
+        return { ...safeUser, authAt: startedAt };
       },
     }),
   ],
 });
+
+export const { handlers, auth, signIn, signOut } = nextAuth;

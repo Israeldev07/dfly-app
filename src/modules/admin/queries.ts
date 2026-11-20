@@ -92,7 +92,7 @@ export function getAdminOrder(publicCode: string) {
       events: { orderBy: { createdAt: "asc" }, select: { id: true, from: true, to: true, actor: true, createdAt: true } },
       messages: {
         orderBy: { createdAt: "asc" },
-        select: { id: true, kind: true, status: true, attempts: true, lastError: true, payload: true, createdAt: true, updatedAt: true },
+        select: { id: true, kind: true, status: true, attempts: true, partsSent: true, lastError: true, payload: true, createdAt: true, updatedAt: true },
       },
     },
   });

@@ -12,10 +12,15 @@ export const RATE_LIMITS = {
   "register:ip": { limit: 5, windowSec: 60 * 60 },
   /** Cada pedido genera mensajes de WhatsApp al dueño y al comercio. */
   "order:user": { limit: 5, windowSec: 10 * 60 },
-  /** Códigos para verificar el celular (no envían nada, pero evita rotar números sin parar). */
-  "phone-code:user": { limit: 6, windowSec: 60 * 60 },
-  /** Cada código de email es un envío real (cuesta y puede ir a spam). */
+  /** Códigos al correo de la cuenta. */
   "email-code:user": { limit: 5, windowSec: 60 * 60 },
+  /** Cada código por WhatsApp cuesta (plantilla de autenticación): por cuenta, por número y por IP. */
+  "phone-code:user": { limit: 5, windowSec: 60 * 60 },
+  "phone-code:phone": { limit: 3, windowSec: 60 * 60 },
+  "phone-code:ip": { limit: 10, windowSec: 60 * 60 },
+  /** Enlaces de recuperación: por correo (no inundar un buzón) y por IP (no barrer correos). */
+  "password-reset:email": { limit: 3, windowSec: 60 * 60 },
+  "password-reset:ip": { limit: 10, windowSec: 60 * 60 },
 } as const satisfies Record<string, { limit: number; windowSec: number; blockSec?: number }>;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;

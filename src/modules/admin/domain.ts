@@ -87,11 +87,19 @@ export function canAdminCancel(status: OrderStatus) {
 }
 
 /**
- * Solo se reintentan mensajes fallidos. El pedido al comercio solo mientras el pedido
- * siga PENDING: si ya se canceló o venció, reenviarlo le pediría preparar algo que no va.
+ * Solo se reintentan mensajes fallidos. El pedido al comercio, mientras siga PENDING o, si ya le llegó
+ * el primer mensaje, mientras siga en curso: si se canceló o venció, le pediría preparar algo que no va.
  */
-export function canRetryMessage(kind: OutboxKind, messageStatus: OutboxStatus, orderStatus: OrderStatus) {
+export function canRetryMessage(
+  kind: OutboxKind,
+  messageStatus: OutboxStatus,
+  orderStatus: OrderStatus,
+  partsSent: number,
+) {
   if (messageStatus !== "FAILED") return false;
-  if (kind === "STORE_REQUEST") return orderStatus === "PENDING";
-  return true;
+  if (kind !== "STORE_REQUEST") return true;
+  if (orderStatus === "PENDING") return true;
+  // Pedido largo: el comercio recibió el primer mensaje pero falló una continuación. Reintentar
+  // solo envía lo que falta, y vale mientras el pedido siga en curso.
+  return partsSent > 0 && (orderStatus === "SENT_TO_STORE" || orderStatus === "ACCEPTED");
 }

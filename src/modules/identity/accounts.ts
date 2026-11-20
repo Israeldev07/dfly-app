@@ -9,11 +9,11 @@ export async function createCredentialsUser(input: {
   email: string;
   phone: string;
   password: string;
-}): Promise<"created" | "email-taken"> {
+}): Promise<{ id: string } | "email-taken"> {
   const existing = await prisma.user.findUnique({ where: { email: input.email }, select: { id: true } });
   if (existing) return "email-taken";
   try {
-    await prisma.user.create({
+    return await prisma.user.create({
       data: {
         name: input.name,
         email: input.email,
@@ -23,7 +23,6 @@ export async function createCredentialsUser(input: {
       },
       select: { id: true },
     });
-    return "created";
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return "email-taken";
     throw error;

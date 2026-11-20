@@ -1,75 +1,59 @@
 "use server";
 
+import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { consumeRateLimit } from "@/lib/rate-limit";
-import { retryAfterLabel } from "@/lib/rate-limit-rules";
+import { clientIp, retryAfterLabel } from "@/lib/rate-limit-rules";
 import { phoneSchema } from "@/lib/validations/auth";
-import { fieldErrorsFrom, SESSION_EXPIRED } from "./form-errors";
-import { verificationLink, verificationText } from "./phone-code";
-import {
-  allowPhoneSimulation,
-  phoneVerificationStatus,
-  simulatePhoneMessage,
-  startPhoneVerification,
-} from "./phone-verification";
+import { codeResultState, fieldErrorsFrom, SESSION_EXPIRED, type CodeState } from "./form-errors";
+import { sendPhoneCode, verifyPhoneCode } from "./phone-verification";
+import { normalizeCode } from "./verification-code";
 
-export type PhoneVerificationState = {
-  error?: string;
+export type PhoneCodeState = CodeState & {
   fieldErrors?: Partial<Record<string, string>>;
+  /** Número (E.164) al que se envió el código. */
+  phone?: string;
   values?: { phone: string };
-  verified?: boolean;
-  /** Código pendiente: el usuario debe enviarlo desde su WhatsApp. */
-  pending?: { code: string; text: string; link: string | null; expiresAt: string; phone: string };
 };
 
-/** Guarda el celular y devuelve el código y el enlace de WhatsApp para verificarlo. */
-export async function startPhoneVerificationAction(
-  _prev: PhoneVerificationState,
-  formData: FormData,
-): Promise<PhoneVerificationState> {
+/** Envía por WhatsApp un código de 6 dígitos al celular indicado. */
+export async function sendPhoneCodeAction(_prev: PhoneCodeState, formData: FormData): Promise<PhoneCodeState> {
   const session = await auth();
   if (!session?.user?.id) return { error: SESSION_EXPIRED };
 
   const raw = { phone: String(formData.get("phone") ?? "") };
   const parsed = phoneSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error.issues), values: raw };
+  const { phone } = parsed.data;
 
-  const limit = await consumeRateLimit("phone-code:user", session.user.id);
-  if (!limit.ok) {
-    return { error: `Pediste varios códigos seguidos. Inténtalo en ${retryAfterLabel(limit.retryAfterSec)}.`, values: raw };
+  // Cada envío cuesta: se limita por cuenta, por número de destino y por conexión.
+  const checks = [
+    await consumeRateLimit("phone-code:user", session.user.id),
+    await consumeRateLimit("phone-code:phone", phone),
+    await consumeRateLimit("phone-code:ip", clientIp(await headers())),
+  ];
+  const blocked = checks.find((c) => !c.ok);
+  if (blocked && !blocked.ok) {
+    return { error: `Pediste varios códigos seguidos. Inténtalo en ${retryAfterLabel(blocked.retryAfterSec)}.`, values: raw };
   }
 
-  const result = await startPhoneVerification(session.user.id, parsed.data.phone);
-  if (result.verified) return { verified: true, values: raw };
-
-  const dflyNumber = process.env.DFLY_WHATSAPP_NUMBER;
-  if (!dflyNumber && process.env.NODE_ENV === "production") {
-    console.error("[phone] DFLY_WHATSAPP_NUMBER no configurado");
-    return { error: "No pudimos preparar la verificación. Inténtalo más tarde.", values: raw };
+  try {
+    const result = await sendPhoneCode(session.user.id, phone);
+    if (result.verified) return { verified: true, values: raw };
+  } catch (error) {
+    console.error("[phone] no se pudo enviar el código por WhatsApp", error);
+    return { error: "No pudimos enviarte el código por WhatsApp. Revisa el número o inténtalo en unos minutos.", values: raw };
   }
-  return {
-    values: raw,
-    pending: {
-      code: result.code,
-      text: verificationText(result.code),
-      link: dflyNumber ? verificationLink(dflyNumber, result.code) : null,
-      expiresAt: result.expiresAt.toISOString(),
-      phone: parsed.data.phone,
-    },
-  };
+  return { sent: true, phone, values: raw };
 }
 
-/** Lo consulta la página mientras espera el mensaje del usuario. */
-export async function phoneVerificationStatusAction(): Promise<{ verified: boolean }> {
+export async function verifyPhoneCodeAction(prev: PhoneCodeState, formData: FormData): Promise<PhoneCodeState> {
   const session = await auth();
-  if (!session?.user?.id) return { verified: false };
-  return phoneVerificationStatus(session.user.id);
-}
+  if (!session?.user?.id) return { error: SESSION_EXPIRED };
 
-/** Solo desarrollo (sin WhatsApp real): hace lo mismo que el webhook al recibir el código. */
-export async function simulatePhoneVerificationAction(code: string): Promise<{ verified: boolean }> {
-  if (!allowPhoneSimulation()) return { verified: false };
-  const session = await auth();
-  if (!session?.user?.id) return { verified: false };
-  return { verified: await simulatePhoneMessage(session.user.id, code) };
+  const code = normalizeCode(String(formData.get("code") ?? ""));
+  if (!code) return { ...prev, sent: true, error: "Escribe los 6 dígitos del código." };
+
+  const result = codeResultState(await verifyPhoneCode(session.user.id, code));
+  return { ...result, phone: prev.phone, values: prev.values };
 }

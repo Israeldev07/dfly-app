@@ -13,10 +13,16 @@ type Props = {
   deliveryFeeCents: number;
   /** Sin celular verificado no se puede pedir (el servidor también lo exige). */
   phoneVerified: boolean;
+  emailVerified: boolean;
   defaults: { addressLine: string; sector: string; reference: string };
 };
 
-export function CheckoutForm({ deliveryFeeCents, phoneVerified, defaults }: Props) {
+export function CheckoutForm({ deliveryFeeCents, phoneVerified, emailVerified, defaults }: Props) {
+  const blocker = !emailVerified
+    ? "Verifica tu correo para poder hacer tu pedido."
+    : !phoneVerified
+      ? "Verifica tu celular para poder hacer tu pedido."
+      : null;
   const hydrated = useCartHydrated();
   const store = useCart((s) => s.store);
   const lines = useCart((s) => s.lines);
@@ -224,13 +230,11 @@ export function CheckoutForm({ deliveryFeeCents, phoneVerified, defaults }: Prop
           </div>
         ) : null}
 
-        <SubmitButton pendingLabel="Enviando tu pedido…" disabled={!phoneVerified}>
+        <SubmitButton pendingLabel="Enviando tu pedido…" disabled={blocker !== null}>
           Hacer pedido · {formatUsd(totalCents)}
         </SubmitButton>
-        <p className={`text-center text-[12.5px] ${phoneVerified ? "text-ink-soft" : "font-semibold text-brand-deep"}`}>
-          {phoneVerified
-            ? "Te avisaremos por WhatsApp cuando el comercio confirme."
-            : "Verifica tu celular para poder hacer tu pedido."}
+        <p className={`text-center text-[12.5px] ${blocker ? "font-semibold text-brand-deep" : "text-ink-soft"}`}>
+          {blocker ?? "Te avisaremos por WhatsApp cuando el comercio confirme."}
         </p>
       </aside>
     </form>

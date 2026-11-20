@@ -89,9 +89,9 @@ export async function retryMessageAction(_prev: AdminFormState, formData: FormDa
 
   const msg = await prisma.outboxMessage.findUnique({
     where: { id: messageId.data },
-    select: { kind: true, status: true, orderId: true, order: { select: { status: true } } },
+    select: { kind: true, status: true, partsSent: true, orderId: true, order: { select: { status: true } } },
   });
-  if (!msg || !canRetryMessage(msg.kind, msg.status, msg.order.status)) {
+  if (!msg || !canRetryMessage(msg.kind, msg.status, msg.order.status, msg.partsSent)) {
     return { error: "Este mensaje ya no se puede reintentar." };
   }
 

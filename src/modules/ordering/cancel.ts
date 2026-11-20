@@ -40,10 +40,13 @@ async function applyCancellation(
 
   await tx.outboxMessage.updateMany({
     where: { orderId: order.id, kind: "STORE_REQUEST", status: { in: ["PENDING", "FAILED"] } },
-    data: { status: "SKIPPED", lastError: "Pedido cancelado antes de enviarse" },
+    data: { status: "SKIPPED", lastError: "Pedido cancelado antes de enviarse por completo" },
   });
   const [storeWasContacted, storeAlreadyTold] = await Promise.all([
-    tx.outboxMessage.count({ where: { orderId: order.id, kind: "STORE_REQUEST", status: "SENT" } }),
+    // Recibió el pedido si salió entero o al menos su primer mensaje (pedidos largos van en varios).
+    tx.outboxMessage.count({
+      where: { orderId: order.id, kind: "STORE_REQUEST", OR: [{ status: "SENT" }, { partsSent: { gt: 0 } }] },
+    }),
     // Al vencer, el comercio ya recibió "no lo prepares".
     tx.outboxMessage.count({ where: { orderId: order.id, kind: { in: ["STORE_CANCELLED", "STORE_LATE_RESPONSE"] } } }),
   ]);

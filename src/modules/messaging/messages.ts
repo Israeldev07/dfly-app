@@ -26,15 +26,24 @@ export type AdminOrderView = StoreOrderView & {
   totalLabel: string;
 };
 
-export type OutgoingMessage = {
+/** Un mensaje de WhatsApp: una plantilla con sus variables. */
+export type TemplateMessage = {
   template: string;
   language: string;
   bodyParams: string[];
   /** Payloads de los botones quick reply, en el orden definido en la plantilla. */
   quickReplies?: string[];
+  /** Plantillas de autenticación: el código del botón "Copiar código" (botón tipo URL, índice 0). */
+  otpCode?: string;
   /** Texto legible para logs, panel admin y el transporte de desarrollo. */
   preview: string;
 };
+
+/**
+ * Lo que se encola. `continuation`: mensajes que salen después del principal, en orden, cuando
+ * el pedido no cabe en una sola plantilla. El outbox los trata como un único envío.
+ */
+export type OutgoingMessage = TemplateMessage & { continuation?: TemplateMessage[] };
 
 export const TEMPLATES = {
   adminNewOrder: "nuevo_pedido_admin",
@@ -50,13 +59,124 @@ export const TEMPLATES = {
   adminCustomerCancelled: "pedido_cancelado_por_cliente_admin",
   adminCancelRequest: "solicitud_cancelacion_admin",
   customerCancelRejected: "cancelacion_rechazada_cliente",
+  /** Continuación de un pedido largo (al comercio o al dueño). Variables: código, "2/3", detalle. */
+  orderDetailPart: "pedido_detalle_parte",
+  /**
+   * Código para verificar el celular. Plantilla de categoría AUTHENTICATION (la única que Meta permite
+   * para códigos), con botón "Copiar código". Variable: el código.
+   */
+  authCode: "codigo_verificacion",
 } as const;
 
 const LANG = "es";
 
+/** Meta rechaza el envío (error 132005) si el cuerpo, ya con las variables, supera 1024 caracteres. */
+export const TEMPLATE_BODY_LIMIT = 1024;
+/** Tope para el texto fijo de las plantillas de pedido en Meta; el resto queda para las variables. */
+export const TEMPLATE_FIXED_TEXT_MAX = 200;
+const PARAMS_BUDGET = TEMPLATE_BODY_LIMIT - TEMPLATE_FIXED_TEXT_MAX;
+/**
+ * Más continuaciones que esto no se aceptan: el checkout pide dividir el pedido. Alcanza para un carrito
+ * de 40 líneas (el máximo del checkout) con acompañantes; solo lo superan opciones desmesuradas.
+ */
+export const MAX_CONTINUATION_PARTS = 9;
+/** Espacio mínimo para productos en el mensaje principal antes de mover otros campos a la continuación. */
+const ITEMS_MIN_ROOM = 150;
+const CONTINUES = " (sigue en el próximo mensaje)";
+const MOVED = "En el próximo mensaje";
+
 /** Meta no admite saltos de línea, tabulaciones ni más de 4 espacios seguidos en parámetros. */
+function cleanParam(value: string) {
+  return value.replace(/[\r\n\t]+/g, " / ").replace(/ {2,}/g, " ").trim();
+}
+
 export function toParam(value: string) {
-  return value.replace(/[\r\n\t]+/g, " / ").replace(/ {2,}/g, " ").trim().slice(0, 1000) || "-";
+  return cleanParam(value).slice(0, 1000) || "-";
+}
+
+const totalLength = (params: string[]) => params.reduce((sum, p) => sum + p.length, 0);
+
+/**
+ * Reparte las líneas en bloques de como mucho `firstBudget` (el primero) y `restBudget` caracteres,
+ * unidas con ", ". Nunca pierde texto: una línea que no cabe sola se corta, si se puede, en un espacio.
+ */
+export function packLines(lines: string[], firstBudget: number, restBudget: number): string[] {
+  const chunks: string[] = [];
+  let current = "";
+  const budget = () => Math.max(1, chunks.length === 0 ? firstBudget : restBudget);
+  for (const line of lines) {
+    let rest = line;
+    while (rest) {
+      const sep = current ? ", " : "";
+      if (current.length + sep.length + rest.length <= budget()) {
+        current += sep + rest;
+        rest = "";
+      } else if (current) {
+        chunks.push(current);
+        current = "";
+      } else {
+        const max = budget();
+        const space = rest.lastIndexOf(" ", max);
+        const at = space > 0 ? space : max;
+        chunks.push(rest.slice(0, at).trimEnd());
+        rest = rest.slice(at).trimStart();
+      }
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+type MovableField = { index: number; label: string };
+
+/**
+ * Arma el cuerpo de un mensaje de pedido (`params[0]` es el código y `itemsIndex` la lista de productos).
+ * Si no cabe en el límite de Meta, la lista sigue en mensajes de continuación y, si aun así no queda
+ * sitio para productos, también los campos `movable` (en orden). Nada se trunca.
+ */
+function fitOrderBody(params: string[], itemsIndex: number, lines: string[], movable: MovableField[]) {
+  const body = params.map(toParam);
+  const cleanLines = lines.map(cleanParam).filter(Boolean);
+  const fullItems = cleanLines.join(", ") || "-";
+  body[itemsIndex] = fullItems;
+  if (totalLength(body) <= PARAMS_BUDGET) return { body, continuation: [] as TemplateMessage[] };
+
+  const code = body[0];
+  const room = () => PARAMS_BUDGET - (totalLength(body) - body[itemsIndex].length) - CONTINUES.length;
+  const moved: string[] = [];
+  for (const field of movable) {
+    if (room() >= ITEMS_MIN_ROOM) break;
+    moved.push(`${field.label}: ${body[field.index]}`);
+    body[field.index] = MOVED;
+  }
+
+  const partRoom = PARAMS_BUDGET - code.length - "99/99".length;
+  const [first = "", ...restItems] = packLines(cleanLines, room(), partRoom);
+  const parts = packLines([...restItems, ...moved], partRoom, partRoom);
+  body[itemsIndex] = parts.length > 0 ? `${first}${CONTINUES}` : first || "-";
+
+  const total = parts.length + 1;
+  const continuation = parts.map((text, k): TemplateMessage => {
+    const partParams = [code, `${k + 2}/${total}`, text];
+    return {
+      template: TEMPLATES.orderDetailPart,
+      language: LANG,
+      bodyParams: partParams,
+      preview: `Pedido #${code} (parte ${partParams[1]}): ${text}`,
+    };
+  });
+  return { body, continuation };
+}
+
+/** Todos los mensajes que componen un envío, en el orden en que salen. */
+export function messageParts(message: OutgoingMessage): TemplateMessage[] {
+  const { continuation = [], ...main } = message;
+  return [main, ...continuation];
+}
+
+/** Si un mensaje de pedido necesitaría más continuaciones de las admitidas. */
+export function exceedsMaxParts(message: OutgoingMessage) {
+  return (message.continuation?.length ?? 0) > MAX_CONTINUATION_PARTS;
 }
 
 /** Quita teléfonos, correos y enlaces que el cliente pueda escribir en las indicaciones. */
@@ -70,29 +190,38 @@ export function sanitizeStoreNotes(notes: string | null | undefined) {
   return cleaned || null;
 }
 
-function itemsLine(items: LineView[]) {
-  return items.map((i) => `${i.quantity} x ${i.name}${i.options ? ` (${i.options})` : ""}`).join(", ");
+function itemLines(items: LineView[]) {
+  return items.map((i) => `${i.quantity} x ${i.name}${i.options ? ` (${i.options})` : ""}`);
 }
 
 const PAYMENT_LABEL = { CASH: "Efectivo", TRANSFER: "Transferencia" } as const;
 
 export function adminNewOrderMessage(o: AdminOrderView): OutgoingMessage {
-  const params = [
-    o.publicCode,
-    o.storeName,
-    itemsLine(o.items),
-    o.totalLabel,
-    PAYMENT_LABEL[o.paymentMethod],
-    o.customerName,
-    o.customerPhone,
-    o.deliveryAddress,
-    o.storeNotes ?? "Sin indicaciones",
-  ].map(toParam);
+  const { body: params, continuation } = fitOrderBody(
+    [
+      o.publicCode,
+      o.storeName,
+      "",
+      o.totalLabel,
+      PAYMENT_LABEL[o.paymentMethod],
+      o.customerName,
+      o.customerPhone,
+      o.deliveryAddress,
+      o.storeNotes ?? "Sin indicaciones",
+    ],
+    2,
+    itemLines(o.items),
+    [
+      { index: 8, label: "Indicaciones" },
+      { index: 7, label: "Dirección" },
+    ],
+  );
   return {
     template: TEMPLATES.adminNewOrder,
     language: LANG,
     bodyParams: params,
     preview: `Nuevo pedido #${params[0]} para ${params[1]}: ${params[2]}. Total ${params[3]} (${params[4]}). Cliente: ${params[5]}, ${params[6]}. Dirección: ${params[7]}. Indicaciones: ${params[8]}.`,
+    ...(continuation.length > 0 ? { continuation } : {}),
   };
 }
 
@@ -100,13 +229,20 @@ export function storeRequestMessage(
   o: StoreOrderView,
   payloads: { accept: string; reject: string },
 ): OutgoingMessage {
-  const params = [o.publicCode, itemsLine(o.items), o.storeNotes ?? "Sin indicaciones"].map(toParam);
+  // Los botones van en el primer mensaje: el comercio puede responder aunque falle una continuación.
+  const { body: params, continuation } = fitOrderBody(
+    [o.publicCode, "", o.storeNotes ?? "Sin indicaciones"],
+    1,
+    itemLines(o.items),
+    [{ index: 2, label: "Indicaciones" }],
+  );
   return {
     template: TEMPLATES.storeRequest,
     language: LANG,
     bodyParams: params,
     quickReplies: [payloads.accept, payloads.reject],
     preview: `Pedido #${params[0]} de Dfly: ${params[1]}. Indicaciones: ${params[2]}. [Aceptar] [Rechazar]`,
+    ...(continuation.length > 0 ? { continuation } : {}),
   };
 }
 
@@ -241,5 +377,16 @@ export function adminLateResponseMessage(
     language: LANG,
     bodyParams: params,
     preview: `Pedido #${params[0]}: ${params[1]} pulsó ${params[2]} con el pedido ya ${params[3]}.`,
+  };
+}
+
+/** Código de verificación del celular (plantilla de autenticación de Meta). */
+export function authCodeMessage(code: string): OutgoingMessage {
+  return {
+    template: TEMPLATES.authCode,
+    language: LANG,
+    bodyParams: [code],
+    otpCode: code,
+    preview: `${code} es tu código de verificación de Dfly.`,
   };
 }

@@ -1,22 +1,10 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
-import {
-  EMAIL_CODE_MAX_ATTEMPTS,
-  EMAIL_CODE_TTL_MIN,
-  emailCodeMatches,
-  emailCodeMessage,
-  generateEmailCode,
-  hashEmailCode,
-} from "./email-code";
+import { emailCodeMessage } from "./emails";
+import { checkCode, discardCode, issueCode, type CheckCodeResult } from "./verification-store";
 
-function secret() {
-  const value = process.env.AUTH_SECRET;
-  if (!value) throw new Error("Falta AUTH_SECRET");
-  return value;
-}
-
-/** Genera un código nuevo (invalida el anterior y reinicia los intentos) y lo envía por email. */
+/** Genera un código nuevo (invalida el anterior) y lo envía al correo de la cuenta. */
 export async function sendEmailCode(userId: string): Promise<"sent" | "already-verified"> {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
@@ -24,49 +12,23 @@ export async function sendEmailCode(userId: string): Promise<"sent" | "already-v
   });
   if (user.emailVerified) return "already-verified";
 
-  const code = generateEmailCode();
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      emailCodeHash: hashEmailCode(userId, code, secret()),
-      emailCodeExpiresAt: new Date(Date.now() + EMAIL_CODE_TTL_MIN * 60_000),
-      emailCodeAttempts: 0,
-    },
-    select: { id: true },
-  });
-  await sendEmail({ to: user.email, ...emailCodeMessage(user.name, code) });
+  const { code } = await issueCode(userId, "EMAIL", user.email);
+  try {
+    await sendEmail(emailCodeMessage(user.email, user.name, code));
+  } catch (error) {
+    await discardCode(userId, "EMAIL");
+    throw error;
+  }
   return "sent";
 }
 
-export type VerifyEmailResult = { ok: true } | { ok: false; reason: "wrong"; attemptsLeft: number } | { ok: false; reason: "expired" };
-
-/** Comprueba el código. Cada intento se cuenta ANTES de comparar, así no se puede probar en paralelo. */
-export async function verifyEmailCode(userId: string, code: string): Promise<VerifyEmailResult> {
-  const now = new Date();
-  const { count } = await prisma.user.updateMany({
-    where: {
-      id: userId,
-      emailCodeHash: { not: null },
-      emailCodeExpiresAt: { gt: now },
-      emailCodeAttempts: { lt: EMAIL_CODE_MAX_ATTEMPTS },
-    },
-    data: { emailCodeAttempts: { increment: 1 } },
+/** El código solo vale para el email al que se envió: si la cuenta cambiara de email, no lo verifica. */
+export async function verifyEmailCode(userId: string, code: string): Promise<CheckCodeResult> {
+  return checkCode(userId, "EMAIL", code, async (tx, target) => {
+    const { count } = await tx.user.updateMany({
+      where: { id: userId, email: target },
+      data: { emailVerified: new Date() },
+    });
+    if (count === 0) throw new Error("El email de la cuenta cambió mientras se verificaba");
   });
-  if (count === 0) return { ok: false, reason: "expired" };
-
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { emailCodeHash: true, emailCodeAttempts: true },
-  });
-  if (!user.emailCodeHash || !emailCodeMatches(user.emailCodeHash, userId, code, secret())) {
-    const attemptsLeft = Math.max(0, EMAIL_CODE_MAX_ATTEMPTS - user.emailCodeAttempts);
-    return attemptsLeft === 0 ? { ok: false, reason: "expired" } : { ok: false, reason: "wrong", attemptsLeft };
-  }
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { emailVerified: now, emailCodeHash: null, emailCodeExpiresAt: null, emailCodeAttempts: 0 },
-    select: { id: true },
-  });
-  return { ok: true };
 }

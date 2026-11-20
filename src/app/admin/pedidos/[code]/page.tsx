@@ -15,8 +15,18 @@ export async function generateMetadata({ params }: PageProps<"/admin/pedidos/[co
   return { title: `Pedido #${code}` };
 }
 
+const previewText = (value: unknown) =>
+  value && typeof value === "object" && "preview" in value && typeof value.preview === "string" ? value.preview : null;
+
+/** Texto del mensaje y, en pedidos largos, de sus continuaciones. */
 function previewOf(payload: unknown) {
-  return payload && typeof payload === "object" && "preview" in payload && typeof payload.preview === "string" ? payload.preview : null;
+  const main = previewText(payload);
+  if (!main) return null;
+  const continuation =
+    payload && typeof payload === "object" && "continuation" in payload && Array.isArray(payload.continuation)
+      ? payload.continuation.map(previewText).filter((p): p is string => p !== null)
+      : [];
+  return [main, ...continuation].join(" · ");
 }
 
 export default async function AdminOrderPage({ params }: PageProps<"/admin/pedidos/[code]">) {
@@ -114,7 +124,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/pedid
                       {m.lastError && m.status !== "SENT" ? (
                         <p className="text-[13.5px] font-medium break-words text-brand-deep">{m.lastError}</p>
                       ) : null}
-                      {canRetryMessage(m.kind, m.status, order.status) ? (
+                      {canRetryMessage(m.kind, m.status, order.status, m.partsSent) ? (
                         <div className="pt-1">
                           <RetryMessage messageId={m.id} />
                         </div>

@@ -23,6 +23,10 @@ class CloudApiTransport implements WhatsAppTransport {
         index: String(index),
         parameters: [{ type: "payload", payload }],
       })),
+      // El botón "Copiar código" de las plantillas de autenticación es de tipo URL y lleva el código.
+      ...(message.otpCode
+        ? [{ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: message.otpCode }] }]
+        : []),
     ];
 
     const res = await fetch(`https://graph.facebook.com/${this.version}/${this.phoneNumberId}/messages`, {

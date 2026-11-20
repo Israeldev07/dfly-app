@@ -3,19 +3,29 @@
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, LoaderCircle, Mail } from "lucide-react";
+import { CodeField, LinkButton } from "@/components/code-field";
 import { FormError, SubmitButton } from "@/components/forms";
-import { sendEmailCodeAction, verifyEmailCodeAction, type EmailVerificationState } from "@/modules/identity/email-actions";
+import { sendEmailCodeAction, verifyEmailCodeAction } from "@/modules/identity/email-actions";
+import type { CodeState } from "@/modules/identity/form-errors";
 
-/** Verificación del email con un código de 6 dígitos que llega al correo. No bloquea los pedidos. */
-export function EmailVerification({ email, verified: initialVerified }: { email: string; verified: boolean }) {
+type Props = {
+  email: string;
+  verified: boolean;
+  /** Tras registrarse el código ya salió: se muestra directamente el campo para escribirlo. */
+  codeAlreadySent?: boolean;
+};
+
+/** Verificación del correo con un código de 6 dígitos (se hace una sola vez). */
+export function EmailVerification({ email, verified: initialVerified, codeAlreadySent = false }: Props) {
   const router = useRouter();
   const [verified, setVerified] = useState(initialVerified);
-  const [codeSent, setCodeSent] = useState(false);
+  const [codeSent, setCodeSent] = useState(codeAlreadySent);
   const [sendError, setSendError] = useState<string>();
-  const [resentAt, setResentAt] = useState<number | null>(null);
+  const [resent, setResent] = useState(false);
   const [sending, startSend] = useTransition();
 
-  const [state, verifyAction] = useActionState<EmailVerificationState, FormData>(async (prev, formData) => {
+  const [state, verifyAction] = useActionState<CodeState, FormData>(async (prev, formData) => {
+    setSendError(undefined);
     const next = await verifyEmailCodeAction(prev, formData);
     if (next.verified) {
       setVerified(true);
@@ -31,7 +41,7 @@ export function EmailVerification({ email, verified: initialVerified }: { email:
   function send() {
     setSendError(undefined);
     startSend(async () => {
-      const res = await sendEmailCodeAction();
+      const res = await sendEmailCodeAction().catch(() => ({ error: "Sin conexión. Revisa tu internet e inténtalo de nuevo." }) as CodeState);
       if (res.verified) {
         setVerified(true);
         router.refresh();
@@ -39,8 +49,8 @@ export function EmailVerification({ email, verified: initialVerified }: { email:
       }
       setSendError(res.error);
       if (res.sent) {
+        if (codeSent && !res.error) setResent(true);
         setCodeSent(true);
-        if (!res.error) setResentAt(Date.now());
       }
     });
   }
@@ -62,8 +72,7 @@ export function EmailVerification({ email, verified: initialVerified }: { email:
       <div className="flex flex-col gap-4">
         <FormError message={sendError} />
         <p className="text-[15px] leading-relaxed">
-          Confirma que <span className="font-semibold break-all">{email}</span> es tuyo. Te enviaremos un código de 6
-          dígitos.
+          Te enviaremos un código de 6 dígitos a <span className="font-semibold break-all">{email}</span>.
         </p>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <button
@@ -80,13 +89,7 @@ export function EmailVerification({ email, verified: initialVerified }: { email:
             )}
             {sending ? "Enviando…" : "Enviar código"}
           </button>
-          <button
-            type="button"
-            onClick={() => setCodeSent(true)}
-            className="min-h-11 text-[14px] font-semibold text-brand underline underline-offset-2 hover:text-brand-deep"
-          >
-            Ya tengo un código
-          </button>
+          <LinkButton onClick={() => setCodeSent(true)}>Ya tengo un código</LinkButton>
         </div>
       </div>
     );
@@ -95,38 +98,23 @@ export function EmailVerification({ email, verified: initialVerified }: { email:
   return (
     <form action={verifyAction} noValidate className="flex flex-col gap-4">
       <FormError message={sendError ?? state.error} />
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="email-code" className="text-[14px] font-semibold">
-          Código de 6 dígitos
-        </label>
-        <input
-          id="email-code"
-          name="code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={7}
-          placeholder="123456"
-          aria-describedby="email-code-hint"
-          aria-invalid={state.error ? true : undefined}
-          className="tabular h-12 w-full max-w-56 rounded-control bg-surface px-4 text-[20px] font-bold tracking-[0.3em] text-ink ring-1 ring-ink/20 transition-shadow duration-150 outline-none placeholder:font-normal placeholder:tracking-[0.3em] placeholder:text-ink-soft hover:ring-ink/35 focus-visible:ring-2 focus-visible:ring-route-deep aria-invalid:ring-2 aria-invalid:ring-brand"
-        />
-        <p id="email-code-hint" className="text-[13px] text-ink-soft">
-          {resentAt ? "Te lo enviamos" : "Lo enviamos"} a <span className="break-all">{email}</span>. Vence en 15 minutos;
-          revisa también la carpeta de spam.
-        </p>
-      </div>
+      <CodeField
+        id="email-code"
+        error={state.error}
+        hint={
+          <>
+            {resent ? "Te enviamos uno nuevo" : "Lo enviamos"} a <span className="break-all">{email}</span>. Vence en 15
+            minutos; si no llega, revisa la carpeta de spam.
+          </>
+        }
+      />
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <div className="w-full sm:w-56">
-          <SubmitButton pendingLabel="Verificando…">Verificar email</SubmitButton>
+          <SubmitButton pendingLabel="Verificando…">Verificar correo</SubmitButton>
         </div>
-        <button
-          type="button"
-          onClick={send}
-          disabled={sending}
-          className="min-h-11 text-[14px] font-semibold text-brand underline underline-offset-2 hover:text-brand-deep disabled:opacity-60"
-        >
+        <LinkButton onClick={send} disabled={sending}>
           {sending ? "Enviando…" : "Reenviar código"}
-        </button>
+        </LinkButton>
       </div>
     </form>
   );

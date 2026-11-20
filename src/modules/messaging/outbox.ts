@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { OutboxKind } from "@/generated/prisma/enums";
-import type { OutgoingMessage } from "./messages";
+import { messageParts, type OutgoingMessage } from "./messages";
 import { getTransport } from "./transport";
 
 const MAX_ATTEMPTS = 5;
@@ -52,7 +52,7 @@ export async function dispatchOutbox({ orderId, limit = 25, onSent }: { orderId?
     where: { status: "PENDING", nextAttemptAt: { lte: now }, ...(orderId ? { orderId } : {}) },
     orderBy: { createdAt: "asc" },
     take: limit,
-    select: { id: true, kind: true, orderId: true, to: true, payload: true, attempts: true },
+    select: { id: true, kind: true, orderId: true, to: true, payload: true, attempts: true, partsSent: true },
   });
 
   const transport = getTransport();
@@ -69,15 +69,37 @@ export async function dispatchOutbox({ orderId, limit = 25, onSent }: { orderId?
     const attempt = msg.attempts + 1;
 
     try {
-      const { id } = await transport.send(msg.to, msg.payload as unknown as OutgoingMessage);
-      await prisma.$transaction(async (tx) => {
-        await tx.outboxMessage.update({
-          where: { id: msg.id },
-          data: { status: "SENT", waMessageId: id, lastError: null },
+      // Un pedido largo son varios mensajes: se retoma desde el primero que no salió.
+      const parts = messageParts(msg.payload as unknown as OutgoingMessage);
+      if (msg.partsSent >= parts.length) {
+        // Ya salieron todas (no debería quedar PENDING): se cierra para que no se reclame para siempre.
+        await prisma.outboxMessage.update({ where: { id: msg.id }, data: { status: "SENT", lastError: null } });
+        sent++;
+        continue;
+      }
+      for (let i = msg.partsSent; i < parts.length; i++) {
+        const { id } = await transport.send(msg.to, parts[i]);
+        const last = i === parts.length - 1;
+        const status = await prisma.$transaction(async (tx) => {
+          const row = await tx.outboxMessage.update({
+            where: { id: msg.id },
+            data: {
+              partsSent: i + 1,
+              // Se guarda el id del primero, el que lleva los botones si los hay.
+              ...(i === 0 ? { waMessageId: id } : {}),
+              // Sin cambiar el estado si se canceló mientras salía: `onSent` decide qué avisar.
+              ...(last ? { status: "SENT", lastError: null } : { nextAttemptAt: new Date(Date.now() + LEASE_MS) }),
+            },
+            select: { status: true },
+          });
+          // El efecto en el pedido ocurre con el primer mensaje: desde ahí el comercio ya puede responder.
+          if (i === 0) await onSent(tx, { kind: msg.kind, orderId: msg.orderId });
+          return row.status;
         });
-        await onSent(tx, { kind: msg.kind, orderId: msg.orderId });
-      });
-      sent++;
+        // Cancelado (SKIPPED) entre partes: no se envía el resto.
+        if (!last && status !== "PENDING") break;
+        if (last) sent++;
+      }
     } catch (error) {
       failed++;
       const lastError = error instanceof Error ? error.message.slice(0, 500) : "Error desconocido";

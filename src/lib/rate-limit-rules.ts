@@ -44,6 +44,8 @@ export function loginEmailKey(email: string, ip: string | null): string {
 
 /** Código del `CredentialsSignin` que lanza `authorize` al superar el límite (viaja en la URL). */
 export const RATE_LIMITED_CODE = "rate_limited";
+/** Contraseña correcta, pero la cuenta no tiene verificado ni el correo ni el celular. */
+export const UNVERIFIED_CODE = "unverified";
 
 /**
  * De qué cabecera sale la IP del cliente. Solo vale la que escribe un proxy de confianza: cualquier otra

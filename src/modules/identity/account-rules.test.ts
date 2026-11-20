@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayPhone, isSessionCurrent, passwordResetUpdate, samePhone, verificationStatus } from "./account-rules";
+import { canSignInWithPassword, displayPhone, isSessionCurrent, passwordResetUpdate, samePhone, verificationStatus } from "./account-rules";
 
 describe("celular", () => {
   it("compara solo los dígitos", () => {
@@ -66,5 +66,17 @@ describe("passwordResetUpdate", () => {
     const update = passwordResetUpdate(null, now);
     if (!update.unproven) throw new Error("debía limpiar la cuenta");
     expect(verificationStatus(update)).toEqual({ email: true, phone: false, complete: false });
+  });
+});
+
+describe("canSignInWithPassword", () => {
+  const d = new Date("2026-11-01");
+  it("exige el correo o el celular verificado", () => {
+    expect(canSignInWithPassword({ emailVerified: d, phoneVerifiedAt: null })).toBe(true);
+    expect(canSignInWithPassword({ emailVerified: null, phoneVerifiedAt: d })).toBe(true);
+    expect(canSignInWithPassword({ emailVerified: d, phoneVerifiedAt: d })).toBe(true);
+  });
+  it("no deja entrar a una cuenta que nadie verificó (pudo crearla otro con un correo ajeno)", () => {
+    expect(canSignInWithPassword({ emailVerified: null, phoneVerifiedAt: null })).toBe(false);
   });
 });

@@ -5,13 +5,13 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { signIn, signOut } from "@/auth";
 import { clientIp, consumeRateLimit, peekRateLimit } from "@/lib/rate-limit";
-import { loginEmailKey, RATE_LIMITED_CODE, retryAfterLabel } from "@/lib/rate-limit-rules";
+import { loginEmailKey, RATE_LIMITED_CODE, retryAfterLabel, UNVERIFIED_CODE } from "@/lib/rate-limit-rules";
 import { safeCallbackUrl } from "@/lib/safe-callback";
 import { loginSchema, registerSchema, registrationCodeSchema } from "@/lib/validations/auth";
 import { createCredentialsUser } from "./accounts";
 import { resendRegistrationCode, sendEmailCode } from "./email-verification";
 import { fieldErrorsFrom } from "./form-errors";
-import { notifyExistingAccount } from "./password-reset";
+import { notifyExistingAccount, requestPasswordReset } from "./password-reset";
 import { generateResetToken, registrationTicket } from "./verification-code";
 import { authSecret } from "./verification-store";
 
@@ -35,6 +35,24 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
     if (error instanceof CredentialsSignin && error.code === RATE_LIMITED_CODE) {
       const wait = await loginRetryAfterSec(parsed.data.email);
       return { error: `Demasiados intentos. Vuelve a intentarlo en ${retryAfterLabel(wait)}.`, values };
+    }
+    if (error instanceof CredentialsSignin && error.code === UNVERIFIED_CODE) {
+      // Solo llega aquí quien acertó la contraseña, así que decirlo no revela qué correos tienen cuenta.
+      // El enlace de recuperación prueba que lee el correo; en silencio por el mismo límite de envíos.
+      const email = parsed.data.email;
+      if ((await consumeRateLimit("password-reset:email", email)).ok) {
+        after(async () => {
+          try {
+            await requestPasswordReset(email);
+          } catch (error) {
+            console.error("[password-reset] no se pudo enviar el enlace de confirmación", error);
+          }
+        });
+      }
+      return {
+        error: `Aún no confirmaste tu correo. Te enviamos un enlace a ${email}: ábrelo para confirmarlo y elegir tu contraseña.`,
+        values,
+      };
     }
     if (error instanceof AuthError) {
       return { error: "El correo o la contraseña no coinciden.", values };

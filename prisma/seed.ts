@@ -131,6 +131,8 @@ async function seedAdmin() {
         name: "Admin Dfly",
         role: "ADMIN",
         password: await bcrypt.hash(password, 12),
+        // El login exige correo o celular verificado; el correo del admin lo fija quien ejecuta el seed.
+        emailVerified: new Date(),
       },
     });
     console.log(`Admin creado: ${email}`);
@@ -138,7 +140,12 @@ async function seedAdmin() {
   }
 
   if (existing.role === "ADMIN") {
-    console.log(`Admin ya existente, sin cambios: ${email}`);
+    // Admins creados antes de exigir la verificación para entrar.
+    const { count } = await prisma.user.updateMany({
+      where: { id: existing.id, emailVerified: null },
+      data: { emailVerified: new Date() },
+    });
+    console.log(count ? `Admin ya existente, correo marcado como verificado: ${email}` : `Admin ya existente, sin cambios: ${email}`);
     return;
   }
 
@@ -153,7 +160,7 @@ async function seedAdmin() {
 
   await prisma.user.update({
     where: { id: existing.id },
-    data: { role: "ADMIN", password: await bcrypt.hash(password, 12) },
+    data: { role: "ADMIN", password: await bcrypt.hash(password, 12), emailVerified: new Date() },
   });
   console.log(`Cuenta existente ascendida a ADMIN con contraseña nueva: ${email}`);
 }

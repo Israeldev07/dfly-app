@@ -17,6 +17,15 @@ export function isSessionCurrent(authAt: number | undefined, sessionsValidFrom: 
   return (authAt ?? 0) >= sessionsValidFrom.getTime();
 }
 
+/**
+ * Para entrar con contraseña (y para que una sesión siga valiendo) la cuenta debe tener verificado el
+ * correo o el celular. Sin eso, cualquiera pudo crearla con un correo ajeno sin leerlo; la entrada es
+ * el código del registro o el enlace de recuperación, que prueban que se lee el correo.
+ */
+export function canSignInWithPassword(user: { emailVerified: Date | null; phoneVerifiedAt: Date | null }): boolean {
+  return Boolean(user.emailVerified || user.phoneVerifiedAt);
+}
+
 /** Para pedir hay que tener verificados el correo y el celular (se hace una sola vez, tras registrarse). */
 export function verificationStatus(user: { emailVerified: Date | null; phone: string | null; phoneVerifiedAt: Date | null }) {
   const email = Boolean(user.emailVerified);

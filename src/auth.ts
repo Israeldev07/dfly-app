@@ -5,13 +5,18 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { loginSchema, registrationCodeSchema } from "@/lib/validations/auth";
 import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
-import { loginEmailKey, RATE_LIMITED_CODE } from "@/lib/rate-limit-rules";
+import { loginEmailKey, RATE_LIMITED_CODE, UNVERIFIED_CODE } from "@/lib/rate-limit-rules";
 import authConfig from "@/auth.config";
+import { canSignInWithPassword } from "@/modules/identity/account-rules";
 import { signInWithEmailCode } from "@/modules/identity/email-verification";
 import { isSessionActive } from "@/modules/identity/session-validity";
 
 class RateLimitedSignin extends CredentialsSignin {
   code = RATE_LIMITED_CODE;
+}
+
+class UnverifiedSignin extends CredentialsSignin {
+  code = UNVERIFIED_CODE;
 }
 
 /**
@@ -53,13 +58,24 @@ const nextAuth = NextAuth({
 
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },
-          select: { id: true, name: true, email: true, image: true, role: true, password: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            role: true,
+            password: true,
+            emailVerified: true,
+            phoneVerifiedAt: true,
+          },
         });
         // Siempre un bcrypt, exista o no la cuenta; mismo resultado para email inexistente y contraseña incorrecta.
         const valid = await bcrypt.compare(parsed.data.password, user?.password ?? DUMMY_HASH);
         if (!user?.password || !valid) return null;
+        // Solo tras acertar la contraseña: decirlo antes revelaría qué correos tienen cuenta.
+        if (!canSignInWithPassword(user)) throw new UnverifiedSignin();
 
-        const { password: _password, ...safeUser } = user;
+        const { password: _password, emailVerified: _ev, phoneVerifiedAt: _pv, ...safeUser } = user;
         return { ...safeUser, authAt: startedAt };
       },
     }),

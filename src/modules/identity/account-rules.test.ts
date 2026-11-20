@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayPhone, isSessionCurrent, samePhone, verificationStatus } from "./account-rules";
+import { displayPhone, isSessionCurrent, passwordResetUpdate, samePhone, verificationStatus } from "./account-rules";
 
 describe("celular", () => {
   it("compara solo los dígitos", () => {
@@ -39,5 +39,32 @@ describe("verificación de la cuenta", () => {
     });
     expect(verificationStatus({ emailVerified: now, phone: null, phoneVerifiedAt: now }).phone).toBe(false);
     expect(verificationStatus({ emailVerified: now, phone: "+593991234567", phoneVerifiedAt: null }).complete).toBe(false);
+  });
+});
+
+describe("passwordResetUpdate", () => {
+  const now = new Date("2026-11-20T12:00:00Z");
+
+  it("con el correo ya verificado solo anula las sesiones", () => {
+    expect(passwordResetUpdate(new Date("2026-01-01"), now)).toEqual({ sessionsValidFrom: now, unproven: false });
+  });
+
+  it("con el correo sin verificar borra lo que fijó quien creó la cuenta (B6)", () => {
+    // Un intruso se registró con el correo ajeno y verificó SU celular: la dueña no debe heredarlo.
+    expect(passwordResetUpdate(null, now)).toEqual({
+      sessionsValidFrom: now,
+      unproven: true,
+      emailVerified: now,
+      name: null,
+      phone: null,
+      phoneVerifiedAt: null,
+      whatsappOptInAt: null,
+    });
+  });
+
+  it("tras limpiarla, la cuenta pide verificar el celular otra vez", () => {
+    const update = passwordResetUpdate(null, now);
+    if (!update.unproven) throw new Error("debía limpiar la cuenta");
+    expect(verificationStatus(update)).toEqual({ email: true, phone: false, complete: false });
   });
 });

@@ -2,6 +2,7 @@ import "server-only";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { appUrl, sendEmail } from "@/lib/email";
+import { passwordResetUpdate } from "./account-rules";
 import { accountExistsMessage, passwordResetMessage } from "./emails";
 import { generateResetToken, hashResetToken, isResetTokenShape, RESET_TOKEN_TTL_MIN } from "./verification-code";
 import { authSecret } from "./verification-store";
@@ -57,8 +58,8 @@ export async function isResetTokenValid(token: unknown): Promise<boolean> {
 
 /**
  * Fija la contraseña nueva. Consume el enlace, anula todas las sesiones abiertas (`sessionsValidFrom`)
- * y, como solo quien lee ese correo pudo abrirlo, deja el email verificado. Devuelve el email (para quitarle
- * los bloqueos de login).
+ * y, como solo quien lee ese correo pudo abrirlo, deja el email verificado; si no lo estaba, borra lo que
+ * fijó quien creó la cuenta (`passwordResetUpdate`). Devuelve el email (para quitarle los bloqueos de login).
  */
 export async function resetPassword(token: string, password: string): Promise<{ email: string } | "invalid"> {
   if (!isResetTokenShape(token)) return "invalid";
@@ -71,12 +72,12 @@ export async function resetPassword(token: string, password: string): Promise<{ 
     // Condicionado al hash: dos envíos simultáneos del mismo enlace no lo usan dos veces.
     const { count } = await tx.verificationCode.deleteMany({ where: { id: row.id, codeHash: row.codeHash, expiresAt: { gt: now } } });
     if (count === 0) return "invalid" as const;
-    const { count: updated } = await tx.user.updateMany({
-      where: { id: row.userId, email: row.target },
-      data: { password: hash, sessionsValidFrom: now },
-    });
-    if (updated === 0) return "invalid" as const;
-    await tx.user.updateMany({ where: { id: row.userId, emailVerified: null }, data: { emailVerified: now } });
+    const user = await tx.user.findFirst({ where: { id: row.userId, email: row.target }, select: { emailVerified: true } });
+    if (!user) return "invalid" as const;
+    const { unproven, ...data } = passwordResetUpdate(user.emailVerified, now);
+    await tx.user.update({ where: { id: row.userId }, data: { password: hash, ...data }, select: { id: true } });
+    // Códigos pendientes de la cuenta sin probar (p. ej. uno enviado al celular del intruso).
+    if (unproven) await tx.verificationCode.deleteMany({ where: { userId: row.userId } });
     return { email: row.target };
   });
 }

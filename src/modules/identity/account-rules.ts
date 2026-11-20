@@ -23,3 +23,24 @@ export function verificationStatus(user: { emailVerified: Date | null; phone: st
   const phone = Boolean(user.phone && user.phoneVerifiedAt);
   return { email, phone, complete: email && phone };
 }
+
+/**
+ * Qué cambia en la cuenta al usarse un enlace de recuperación. Abrirlo prueba que se lee el correo.
+ * Si el correo nunca se había verificado, cualquiera pudo crear la cuenta con él (sin leerlo) y fijar
+ * nombre y celular: eso se borra para que la dueña no herede, por ejemplo, el celular de un intruso,
+ * adonde irían los avisos de sus pedidos. Pedir exige el correo verificado, así que no hay pedidos ni
+ * direcciones que limpiar.
+ */
+export function passwordResetUpdate(emailVerified: Date | null, now: Date) {
+  const base = { sessionsValidFrom: now };
+  if (emailVerified) return { ...base, unproven: false as const };
+  return {
+    ...base,
+    unproven: true as const,
+    emailVerified: now,
+    name: null,
+    phone: null,
+    phoneVerifiedAt: null,
+    whatsappOptInAt: null,
+  };
+}

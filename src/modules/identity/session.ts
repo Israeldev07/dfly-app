@@ -1,13 +1,19 @@
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { clearSessionUrl, hasSessionCookie } from "@/lib/session-cookie";
 import { prisma } from "@/lib/db";
 
 /** Verifica la sesión junto al dato; el proxy es solo una capa optimista. */
 export async function requireUser(returnTo: string) {
   const session = await auth();
   if (!session?.user?.id) {
+    // Hay cookie pero la sesión se anuló: aquí no se puede borrar (es un Server Component), así que se
+    // pasa por la ruta que la borra; si no, el navegador la seguiría enviando en cada petición.
+    const names = (await cookies()).getAll().map((c) => c.name);
+    if (hasSessionCookie(names)) redirect(clearSessionUrl(returnTo));
     redirect(`/login?callbackUrl=${encodeURIComponent(returnTo)}`);
   }
   return session.user;

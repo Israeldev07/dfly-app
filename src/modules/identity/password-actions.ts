@@ -2,8 +2,8 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
-import { retryAfterLabel } from "@/lib/rate-limit-rules";
+import { clearRateLimit, clientIp, consumeRateLimit } from "@/lib/rate-limit";
+import { loginEmailKey, retryAfterLabel } from "@/lib/rate-limit-rules";
 import { forgotPasswordSchema, resetPasswordSchema } from "@/lib/validations/auth";
 import { fieldErrorsFrom } from "./form-errors";
 import { requestPasswordReset, resetPassword } from "./password-reset";
@@ -49,9 +49,14 @@ export async function resetPasswordAction(_prev: ResetPasswordState, formData: F
   const parsed = resetPasswordSchema.safeParse(raw);
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error.issues) };
 
-  if ((await resetPassword(parsed.data.token, parsed.data.password)) === "invalid") {
+  const result = await resetPassword(parsed.data.token, parsed.data.password);
+  if (result === "invalid") {
     return { error: "Este enlace ya se usó o venció. Pide uno nuevo." };
   }
+  // Quien abrió el enlace es el dueño: que un tercero lo haya bloqueado no le impide entrar ya.
+  const ip = clientIp(await headers());
+  await clearRateLimit("login:email", result.email);
+  await clearRateLimit("login:email-ip", loginEmailKey(result.email, ip));
   // Todas las sesiones quedaron anuladas: se entra de nuevo con la contraseña nueva.
   redirect("/login?restablecida=1");
 }

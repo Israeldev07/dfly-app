@@ -7,8 +7,13 @@
 export const RATE_LIMITS = {
   /** Intentos de login por IP: frena barridos de muchas cuentas desde un origen. */
   "login:ip": { limit: 30, windowSec: 15 * 60, blockSec: 15 * 60 },
-  /** Intentos de login por email: frena fuerza bruta contra una cuenta. */
-  "login:email": { limit: 8, windowSec: 15 * 60, blockSec: 15 * 60 },
+  /**
+   * Intentos de login por email desde una misma IP (`loginEmailKey`): frena fuerza bruta contra una cuenta
+   * sin que un tercero, desde su conexión, deje fuera al dueño.
+   */
+  "login:email-ip": { limit: 8, windowSec: 15 * 60, blockSec: 15 * 60 },
+  /** Intentos por email sumando todas las IPs: tope alto contra fuerza bruta repartida en muchas conexiones. */
+  "login:email": { limit: 100, windowSec: 60 * 60, blockSec: 60 * 60 },
   "register:ip": { limit: 5, windowSec: 60 * 60 },
   /** Correos que salen al registrarse (código o aviso de cuenta existente) por dirección. Se aplica en silencio. */
   "register:email": { limit: 3, windowSec: 60 * 60 },
@@ -28,6 +33,14 @@ export const RATE_LIMITS = {
 } as const satisfies Record<string, { limit: number; windowSec: number; blockSec?: number }>;
 
 export type RateLimitPolicy = keyof typeof RATE_LIMITS;
+
+/**
+ * Identificador de `login:email-ip`. Sin IP fiable queda solo el email: vuelve a ser un límite por cuenta
+ * (más estricto, pero sin un cubo compartido por todos).
+ */
+export function loginEmailKey(email: string, ip: string | null): string {
+  return ip ? `${email}|${ip}` : email;
+}
 
 /** Código del `CredentialsSignin` que lanza `authorize` al superar el límite (viaja en la URL). */
 export const RATE_LIMITED_CODE = "rate_limited";

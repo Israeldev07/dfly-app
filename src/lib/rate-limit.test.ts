@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const queryRaw = vi.fn();
+const deleteMany = vi.fn();
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/db", () => ({ prisma: { $queryRaw: (...args: unknown[]) => queryRaw(...args) } }));
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    $queryRaw: (...args: unknown[]) => queryRaw(...args),
+    rateLimitBucket: { deleteMany: (...args: unknown[]) => deleteMany(...args) },
+  },
+}));
 vi.mock("@/generated/prisma/client", () => ({ Prisma: { sql: () => "RETRY_AFTER_SQL" } }));
 
 /** El módulo guarda la fuente de IP la primera vez: cada test lo carga de nuevo con su entorno. */
@@ -15,6 +21,7 @@ async function load(env: Record<string, string | undefined>) {
 
 beforeEach(() => {
   queryRaw.mockReset();
+  deleteMany.mockReset();
   vi.stubEnv("TRUSTED_PROXY", undefined);
   vi.stubEnv("VERCEL", undefined);
 });
@@ -63,5 +70,44 @@ describe("consumeRateLimit / peekRateLimit", () => {
     queryRaw.mockResolvedValueOnce([{ count: 31, retryAfterSec: 900 }]);
     await expect(consumeRateLimit("login:ip", "203.0.113.7")).resolves.toEqual({ ok: false, retryAfterSec: 900 });
     expect(queryRaw).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("bloqueo del login por email (B3)", () => {
+  /** Simula los cubos de Postgres: cada clave cuenta sus intentos. */
+  function fakeBuckets() {
+    const counts = new Map<string, number>();
+    queryRaw.mockImplementation((strings: TemplateStringsArray, key: string) => {
+      const count = (counts.get(key) ?? 0) + 1;
+      counts.set(key, count);
+      return Promise.resolve([{ count, retryAfterSec: 900 }]);
+    });
+    deleteMany.mockImplementation(({ where }: { where: { key: string } }) => {
+      counts.delete(where.key);
+      return Promise.resolve({ count: 1 });
+    });
+  }
+
+  it("un tercero que falla 8 veces desde su IP no bloquea al dueño en la suya", async () => {
+    const { consumeRateLimit } = await load({ VERCEL: "1" });
+    const { loginEmailKey } = await import("./rate-limit-rules");
+    fakeBuckets();
+    for (let i = 0; i < 8; i++) await consumeRateLimit("login:email-ip", loginEmailKey("ana@x.com", "6.6.6.6"));
+    await expect(consumeRateLimit("login:email-ip", loginEmailKey("ana@x.com", "6.6.6.6"))).resolves.toMatchObject({ ok: false });
+    await expect(consumeRateLimit("login:email-ip", loginEmailKey("ana@x.com", "203.0.113.7"))).resolves.toEqual({ ok: true });
+  });
+
+  it("clearRateLimit quita el bloqueo", async () => {
+    const { clearRateLimit, consumeRateLimit } = await load({ VERCEL: "1" });
+    fakeBuckets();
+    for (let i = 0; i < 9; i++) await consumeRateLimit("login:email-ip", "ana@x.com");
+    await clearRateLimit("login:email-ip", "ana@x.com");
+    await expect(consumeRateLimit("login:email-ip", "ana@x.com")).resolves.toEqual({ ok: true });
+  });
+
+  it("clearRateLimit sin identificador no toca la base de datos", async () => {
+    const { clearRateLimit } = await load({ VERCEL: "1" });
+    await clearRateLimit("login:email-ip", null);
+    expect(deleteMany).not.toHaveBeenCalled();
   });
 });

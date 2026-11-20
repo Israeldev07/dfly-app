@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientIpFrom, parseIpSource, resolveIpSource, retryAfterLabel } from "./rate-limit-rules";
+import { clientIpFrom, loginEmailKey, parseIpSource, RATE_LIMITS, resolveIpSource, retryAfterLabel } from "./rate-limit-rules";
 
 const h = (init: Record<string, string>) => new Headers(init);
 
@@ -29,6 +29,18 @@ describe("clientIpFrom", () => {
   it("descarta valores que no parecen IP y no confía en nada con 'none'", () => {
     expect(clientIpFrom(h({ "cf-connecting-ip": "<script>" }), { kind: "cloudflare" })).toBeNull();
     expect(clientIpFrom(h({ "x-forwarded-for": "1.2.3.4" }), { kind: "none" })).toBeNull();
+  });
+});
+
+describe("loginEmailKey", () => {
+  it("separa los intentos contra una cuenta según la conexión", () => {
+    expect(loginEmailKey("ana@x.com", "203.0.113.7")).not.toBe(loginEmailKey("ana@x.com", "198.51.100.4"));
+  });
+  it("sin IP fiable vuelve a ser un límite por cuenta", () => {
+    expect(loginEmailKey("ana@x.com", null)).toBe("ana@x.com");
+  });
+  it("el tope por cuenta de todas las IPs es mayor que el de una sola", () => {
+    expect(RATE_LIMITS["login:email"].limit).toBeGreaterThan(RATE_LIMITS["login:email-ip"].limit);
   });
 });
 

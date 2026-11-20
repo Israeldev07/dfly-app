@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { loginSchema, registrationCodeSchema } from "@/lib/validations/auth";
 import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
-import { RATE_LIMITED_CODE } from "@/lib/rate-limit-rules";
+import { loginEmailKey, RATE_LIMITED_CODE } from "@/lib/rate-limit-rules";
 import authConfig from "@/auth.config";
 import { signInWithEmailCode } from "@/modules/identity/email-verification";
 import { isSessionActive } from "@/modules/identity/session-validity";
@@ -43,9 +43,13 @@ const nextAuth = NextAuth({
         if (!parsed.success) return null;
 
         // Aquí y no en loginAction: el endpoint /api/auth/callback/credentials también llega a authorize.
-        const byIp = await consumeRateLimit("login:ip", clientIp(request.headers));
-        const byEmail = await consumeRateLimit("login:email", parsed.data.email);
-        if (!byIp.ok || !byEmail.ok) throw new RateLimitedSignin();
+        const ip = clientIp(request.headers);
+        const checks = [
+          await consumeRateLimit("login:ip", ip),
+          await consumeRateLimit("login:email-ip", loginEmailKey(parsed.data.email, ip)),
+          await consumeRateLimit("login:email", parsed.data.email),
+        ];
+        if (checks.some((c) => !c.ok)) throw new RateLimitedSignin();
 
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },

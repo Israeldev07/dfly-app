@@ -76,6 +76,12 @@ function bucketKey(policy: RateLimitPolicy, identifier: string) {
   return `${policy}:${createHash("sha256").update(identifier).digest("hex")}`;
 }
 
+/** Quita el bloqueo de `identifier` (p. ej. al recuperar la contraseña). */
+export async function clearRateLimit(policy: RateLimitPolicy, identifier: string | null) {
+  if (identifier === null) return;
+  await prisma.rateLimitBucket.deleteMany({ where: { key: bucketKey(policy, identifier) } });
+}
+
 /** Borra ventanas vencidas; lo llama el cron de expiración. */
 export async function pruneRateLimits() {
   const { count } = await prisma.rateLimitBucket.deleteMany({ where: { resetAt: { lt: new Date() } } });

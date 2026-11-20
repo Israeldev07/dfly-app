@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { signIn, signOut } from "@/auth";
 import { clientIp, consumeRateLimit, peekRateLimit } from "@/lib/rate-limit";
-import { RATE_LIMITED_CODE, retryAfterLabel } from "@/lib/rate-limit-rules";
+import { loginEmailKey, RATE_LIMITED_CODE, retryAfterLabel } from "@/lib/rate-limit-rules";
 import { safeCallbackUrl } from "@/lib/safe-callback";
 import { loginSchema, registerSchema, registrationCodeSchema } from "@/lib/validations/auth";
 import { createCredentialsUser } from "./accounts";
@@ -131,10 +131,14 @@ export async function signOutAction() {
   await signOut({ redirectTo: "/" });
 }
 
-/** La espera que ve el usuario es la del bloqueo más largo (por IP o por email). */
+/** La espera que ve el usuario es la del bloqueo más largo (por IP, por email desde esta IP o por email). */
 async function loginRetryAfterSec(email: string) {
   const ip = clientIp(await headers());
-  const checks = await Promise.all([peekRateLimit("login:ip", ip), peekRateLimit("login:email", email)]);
+  const checks = await Promise.all([
+    peekRateLimit("login:ip", ip),
+    peekRateLimit("login:email-ip", loginEmailKey(email, ip)),
+    peekRateLimit("login:email", email),
+  ]);
   return Math.max(...checks.map((c) => (c.ok ? 0 : c.retryAfterSec)), 60);
 }
 

@@ -57,9 +57,10 @@ export async function isResetTokenValid(token: unknown): Promise<boolean> {
 
 /**
  * Fija la contraseña nueva. Consume el enlace, anula todas las sesiones abiertas (`sessionsValidFrom`)
- * y, como solo quien lee ese correo pudo abrirlo, deja el email verificado.
+ * y, como solo quien lee ese correo pudo abrirlo, deja el email verificado. Devuelve el email (para quitarle
+ * los bloqueos de login).
  */
-export async function resetPassword(token: string, password: string): Promise<"ok" | "invalid"> {
+export async function resetPassword(token: string, password: string): Promise<{ email: string } | "invalid"> {
   if (!isResetTokenShape(token)) return "invalid";
   const row = await findResetRow(token);
   if (!row) return "invalid";
@@ -76,7 +77,7 @@ export async function resetPassword(token: string, password: string): Promise<"o
     });
     if (updated === 0) return "invalid" as const;
     await tx.user.updateMany({ where: { id: row.userId, emailVerified: null }, data: { emailVerified: now } });
-    return "ok" as const;
+    return { email: row.target };
   });
 }
 

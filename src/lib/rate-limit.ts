@@ -2,16 +2,33 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
-import { RATE_LIMITS, type RateLimitPolicy } from "./rate-limit-rules";
+import { clientIpFrom, RATE_LIMITS, resolveIpSource, type IpSource, type RateLimitPolicy } from "./rate-limit-rules";
 
 export type RateLimitResult = { ok: true } | { ok: false; retryAfterSec: number };
+
+let ipSource: IpSource | undefined;
+
+/**
+ * IP del cliente según `TRUSTED_PROXY` (ver `resolveIpSource`); null si no hay una cabecera de confianza.
+ * Con null, `consumeRateLimit`/`peekRateLimit` dejan pasar: un límite por IP compartido por todos
+ * ("unknown") bloquearía a todo el mundo a la vez.
+ */
+export function clientIp(headers: Headers): string | null {
+  if (!ipSource) {
+    const { source, warning } = resolveIpSource(process.env);
+    if (warning) console.warn(`[rate-limit] ${warning}`);
+    ipSource = source;
+  }
+  return clientIpFrom(headers, ipSource);
+}
 
 /**
  * Suma un intento a la ventana de `policy` para `identifier` y dice si sigue permitido.
  * Un solo upsert atómico: es seguro con peticiones concurrentes y varias instancias.
- * El identificador se guarda hasheado (puede ser un email o una IP).
+ * El identificador se guarda hasheado (puede ser un email o una IP). Con null (IP desconocida) no limita.
  */
-export async function consumeRateLimit(policy: RateLimitPolicy, identifier: string): Promise<RateLimitResult> {
+export async function consumeRateLimit(policy: RateLimitPolicy, identifier: string | null): Promise<RateLimitResult> {
+  if (identifier === null) return { ok: true };
   const rule: { limit: number; windowSec: number; blockSec?: number } = RATE_LIMITS[policy];
   const { limit, windowSec, blockSec = 0 } = rule;
 
@@ -42,7 +59,8 @@ export async function consumeRateLimit(policy: RateLimitPolicy, identifier: stri
 }
 
 /** Consulta sin sumar un intento: cuánto falta para que `identifier` pueda volver a intentar. */
-export async function peekRateLimit(policy: RateLimitPolicy, identifier: string): Promise<RateLimitResult> {
+export async function peekRateLimit(policy: RateLimitPolicy, identifier: string | null): Promise<RateLimitResult> {
+  if (identifier === null) return { ok: true };
   const { limit } = RATE_LIMITS[policy];
   const [row] = await prisma.$queryRaw<{ count: number; retryAfterSec: number }[]>`
     SELECT "count", ${RETRY_AFTER_SQL} AS "retryAfterSec"

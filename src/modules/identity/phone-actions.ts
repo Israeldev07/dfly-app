@@ -2,8 +2,8 @@
 
 import { headers } from "next/headers";
 import { auth } from "@/auth";
-import { consumeRateLimit } from "@/lib/rate-limit";
-import { clientIp, retryAfterLabel } from "@/lib/rate-limit-rules";
+import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
+import { retryAfterLabel } from "@/lib/rate-limit-rules";
 import { phoneSchema } from "@/lib/validations/auth";
 import { codeResultState, fieldErrorsFrom, SESSION_EXPIRED, type CodeState } from "./form-errors";
 import { sendPhoneCode, verifyPhoneCode } from "./phone-verification";

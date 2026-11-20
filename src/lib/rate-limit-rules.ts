@@ -33,14 +33,67 @@ export type RateLimitPolicy = keyof typeof RATE_LIMITS;
 export const RATE_LIMITED_CODE = "rate_limited";
 
 /**
- * IP del cliente. `x-real-ip` lo fija la plataforma (Vercel) y no lo controla el cliente;
- * `x-forwarded-for` queda como respaldo para otros proxies.
+ * De qué cabecera sale la IP del cliente. Solo vale la que escribe un proxy de confianza: cualquier otra
+ * la puede inventar el cliente para saltarse los límites por IP. Se elige con `TRUSTED_PROXY`:
+ * - `vercel` (por defecto en Vercel): `x-vercel-forwarded-for`, que Vercel fija y no deja inyectar.
+ * - `cloudflare`: `cf-connecting-ip`. Solo es fiable si el servidor no acepta tráfico que no venga de Cloudflare.
+ * - `xff:N`: hay N proxies propios delante, cada uno añade la IP que lo llamó al final de `x-forwarded-for`;
+ *   la del cliente es la N-ésima desde la derecha (lo de la izquierda lo pudo escribir el cliente).
+ * - `none`: no se confía en ninguna; los límites por IP no se aplican (los de por correo y cuenta, sí).
  */
-export function clientIp(headers: Headers): string {
-  const real = headers.get("x-real-ip")?.trim();
-  if (real) return real;
-  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded || "unknown";
+export type IpSource = { kind: "vercel" } | { kind: "cloudflare" } | { kind: "xff"; hops: number } | { kind: "none" };
+
+export function parseIpSource(value: string | undefined): IpSource | null {
+  const v = value?.trim().toLowerCase();
+  if (v === "vercel" || v === "cloudflare" || v === "none") return { kind: v };
+  const xff = v?.match(/^xff:([1-9])$/);
+  return xff ? { kind: "xff", hops: Number(xff[1]) } : null;
+}
+
+/** Recorta y descarta lo que no parece una IP (una cabecera mal formada no debe crear cubos arbitrarios). */
+function cleanIp(value: string | null | undefined): string | null {
+  const ip = value?.trim();
+  return ip && ip.length <= 64 && /^[0-9a-fA-F:.]+$/.test(ip) ? ip : null;
+}
+
+/** IP del cliente según la fuente de confianza; null si no se puede saber. */
+export function clientIpFrom(headers: Headers, source: IpSource): string | null {
+  switch (source.kind) {
+    case "vercel":
+      return cleanIp(headers.get("x-vercel-forwarded-for")?.split(",")[0]);
+    case "cloudflare":
+      return cleanIp(headers.get("cf-connecting-ip"));
+    case "xff": {
+      const hops = (headers.get("x-forwarded-for") ?? "").split(",").map((h) => h.trim()).filter(Boolean);
+      return hops.length >= source.hops ? cleanIp(hops[hops.length - source.hops]) : null;
+    }
+    case "none":
+      return null;
+  }
+}
+
+/**
+ * La fuente configurada. Sin `TRUSTED_PROXY`: Vercel si corre ahí (`VERCEL=1`); en desarrollo, el
+ * `x-forwarded-for` que pone el propio `next dev`; en producción fuera de Vercel, ninguna (no se adivina).
+ */
+export function resolveIpSource(env: { TRUSTED_PROXY?: string; VERCEL?: string; NODE_ENV?: string }): {
+  source: IpSource;
+  warning?: string;
+} {
+  if (env.TRUSTED_PROXY) {
+    const parsed = parseIpSource(env.TRUSTED_PROXY);
+    if (parsed) return { source: parsed };
+    return {
+      source: { kind: "none" },
+      warning: `TRUSTED_PROXY="${env.TRUSTED_PROXY}" no es válido (vercel, cloudflare, xff:N o none): límites por IP desactivados`,
+    };
+  }
+  if (env.VERCEL === "1") return { source: { kind: "vercel" } };
+  if (env.NODE_ENV !== "production") return { source: { kind: "xff", hops: 1 } };
+  return {
+    source: { kind: "none" },
+    warning: "Fuera de Vercel y sin TRUSTED_PROXY: límites por IP desactivados (configúralo según tu proxy)",
+  };
 }
 
 export function retryAfterLabel(seconds: number): string {

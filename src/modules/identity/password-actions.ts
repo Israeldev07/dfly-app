@@ -2,8 +2,8 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { consumeRateLimit } from "@/lib/rate-limit";
-import { clientIp, retryAfterLabel } from "@/lib/rate-limit-rules";
+import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
+import { retryAfterLabel } from "@/lib/rate-limit-rules";
 import { forgotPasswordSchema, resetPasswordSchema } from "@/lib/validations/auth";
 import { fieldErrorsFrom } from "./form-errors";
 import { requestPasswordReset, resetPassword } from "./password-reset";

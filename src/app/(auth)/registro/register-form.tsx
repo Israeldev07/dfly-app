@@ -1,11 +1,24 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Field, FormError, SubmitButton } from "@/components/forms";
-import { registerAction, type FormState } from "@/modules/identity/auth-actions";
+import { registerAction, type RegisterState } from "@/modules/identity/auth-actions";
+import { RegisterCodeStep } from "./register-code-step";
 
 export function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
-  const [state, action] = useActionState<FormState, FormData>(registerAction, {});
+  const [state, action] = useActionState<RegisterState, FormData>(registerAction, {});
+  // "Usar otro correo" vuelve al formulario con los datos que ya escribió.
+  const [editing, setEditing] = useState(false);
+  const [lastPending, setLastPending] = useState(state.pending);
+  if (state.pending !== lastPending) {
+    setLastPending(state.pending);
+    setEditing(false);
+  }
+
+  if (state.pending && !editing) {
+    return <RegisterCodeStep pending={state.pending} callbackUrl={callbackUrl} onChangeEmail={() => setEditing(true)} />;
+  }
+
   const optInError = state.fieldErrors?.whatsappOptIn;
   // Tras un error, la casilla sigue lo que se envió (React reinicia el formulario al terminar la action).
   const optedIn = state.values?.whatsappOptIn === "on";

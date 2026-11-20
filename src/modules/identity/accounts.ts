@@ -3,13 +3,17 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 
-/** Crea la cuenta por credenciales. "email-taken" también si otro registro simultáneo ganó la carrera. */
+/**
+ * Crea la cuenta por credenciales. "email-taken" también si otro registro simultáneo ganó la carrera.
+ * El hash se calcula siempre, antes de mirar el correo: así las dos respuestas tardan lo mismo.
+ */
 export async function createCredentialsUser(input: {
   name: string;
   email: string;
   phone: string;
   password: string;
 }): Promise<{ id: string } | "email-taken"> {
+  const password = await bcrypt.hash(input.password, 12);
   const existing = await prisma.user.findUnique({ where: { email: input.email }, select: { id: true } });
   if (existing) return "email-taken";
   try {
@@ -18,7 +22,7 @@ export async function createCredentialsUser(input: {
         name: input.name,
         email: input.email,
         phone: input.phone,
-        password: await bcrypt.hash(input.password, 12),
+        password,
         whatsappOptInAt: new Date(),
       },
       select: { id: true },

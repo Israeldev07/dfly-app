@@ -158,7 +158,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/pedid
           <div className="flex flex-col gap-1">
             <h2 className="text-[13px] font-medium text-ink-soft">Cliente</h2>
             <p className="text-[17px] font-bold">{order.customerName}</p>
-            <p className="text-[14px] break-all text-ink-soft">{order.user.email}</p>
+            <p className="text-[14px] [overflow-wrap:anywhere] text-ink-soft">{order.user.email}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <a

@@ -48,3 +48,30 @@ export function passwordResetMessage(to: string, name: string | null, link: stri
 </div>`,
   };
 }
+
+/** Alguien (quizá el propio dueño) intentó crear otra cuenta con este correo. */
+export function accountExistsMessage(to: string, name: string | null, resetLink: string): OutgoingEmail {
+  const hello = greeting(name);
+  const note = `El enlace vence en ${RESET_TOKEN_TTL_MIN} minutos. Si no fuiste tú, ignora este mensaje: tu cuenta no cambia.`;
+  return {
+    to,
+    subject: "Ya tienes una cuenta en Dfly",
+    text: [
+      hello,
+      "",
+      "Alguien intentó crear una cuenta en Dfly con este correo, pero ya tienes una.",
+      "Si fuiste tú, inicia sesión con tu contraseña. Si no la recuerdas, elige una nueva aquí:",
+      resetLink,
+      "",
+      note,
+    ].join("\n"),
+    html: `<div ${WRAP}>
+<p>${escapeHtml(hello)}</p>
+<p>Alguien intentó crear una cuenta en Dfly con este correo, pero ya tienes una.</p>
+<p>Si fuiste tú, inicia sesión con tu contraseña. Si no la recuerdas, elige una nueva:</p>
+<p style="margin:20px 0"><a href="${escapeHtml(resetLink)}" style="background:#262626;color:#ffffff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700">Elegir una contraseña nueva</a></p>
+<p ${SMALL}>Si el botón no funciona, copia este enlace: ${escapeHtml(resetLink)}</p>
+<p ${SMALL}>${note}</p>
+</div>`,
+  };
+}

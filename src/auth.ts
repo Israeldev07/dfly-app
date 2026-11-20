@@ -3,10 +3,11 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { loginSchema } from "@/lib/validations/auth";
+import { loginSchema, registrationCodeSchema } from "@/lib/validations/auth";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { clientIp, RATE_LIMITED_CODE } from "@/lib/rate-limit-rules";
 import authConfig from "@/auth.config";
+import { signInWithEmailCode } from "@/modules/identity/email-verification";
 import { isSessionActive } from "@/modules/identity/session-validity";
 
 class RateLimitedSignin extends CredentialsSignin {
@@ -56,6 +57,23 @@ const nextAuth = NextAuth({
 
         const { password: _password, ...safeUser } = user;
         return { ...safeUser, authAt: startedAt };
+      },
+    }),
+    // Primer ingreso tras registrarse: el código que llegó al correo. Responde igual exista o no la cuenta.
+    Credentials({
+      id: "registration-code",
+      credentials: { email: {}, ticket: {}, code: {} },
+      async authorize(raw, request) {
+        const startedAt = Date.now();
+        const parsed = registrationCodeSchema.safeParse(raw);
+        if (!parsed.success) return null;
+
+        const byIp = await consumeRateLimit("login:ip", clientIp(request.headers));
+        const byEmail = await consumeRateLimit("register-code:email", parsed.data.email);
+        if (!byIp.ok || !byEmail.ok) throw new RateLimitedSignin();
+
+        const user = await signInWithEmailCode(parsed.data.email, parsed.data.ticket, parsed.data.code);
+        return user ? { ...user, authAt: startedAt } : null;
       },
     }),
   ],

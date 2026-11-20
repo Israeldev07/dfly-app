@@ -16,7 +16,7 @@ export function ForgotPasswordForm() {
           Revisa tu correo
         </p>
         <p className="text-[15px] leading-relaxed">
-          Si <span className="font-semibold break-all">{state.values?.email}</span> tiene una cuenta en Dfly, te llegará
+          Si <span className="font-semibold [overflow-wrap:anywhere]">{state.values?.email}</span> tiene una cuenta en Dfly, te llegará
           un enlace en unos minutos. Vence en 30 minutos y sirve una sola vez. Si no lo ves, revisa la carpeta de spam.
         </p>
       </div>

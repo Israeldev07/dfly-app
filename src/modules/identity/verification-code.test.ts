@@ -7,6 +7,8 @@ import {
   hashResetToken,
   isResetTokenShape,
   normalizeCode,
+  registrationTicket,
+  ticketMatches,
 } from "./verification-code";
 
 const SECRET = "secreto-de-prueba";
@@ -63,5 +65,18 @@ describe("tokens de recuperación", () => {
     const t = generateResetToken();
     expect(hashResetToken(t, SECRET)).toBe(hashResetToken(t, SECRET));
     expect(hashResetToken(t, SECRET)).not.toBe(hashResetToken(t, "otro"));
+  });
+});
+
+describe("ticket del registro", () => {
+  it("solo vale para la cuenta y el correo con que se creó", () => {
+    const t = registrationTicket("u1", "a@b.com", SECRET);
+    expect(ticketMatches(t, "u1", "a@b.com", SECRET)).toBe(true);
+    expect(ticketMatches(t, "u2", "a@b.com", SECRET)).toBe(false);
+    expect(ticketMatches(t, "u1", "otro@b.com", SECRET)).toBe(false);
+  });
+  it("tiene la misma forma que uno aleatorio (no delata si la cuenta es nueva)", () => {
+    expect(registrationTicket("u1", "a@b.com", SECRET)).toHaveLength(generateResetToken().length);
+    expect(ticketMatches(generateResetToken(), "u1", "a@b.com", SECRET)).toBe(false);
   });
 });

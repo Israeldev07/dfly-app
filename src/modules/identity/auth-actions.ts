@@ -2,15 +2,18 @@
 
 import { AuthError, CredentialsSignin } from "next-auth";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { signIn, signOut } from "@/auth";
 import { consumeRateLimit, peekRateLimit } from "@/lib/rate-limit";
 import { clientIp, RATE_LIMITED_CODE, retryAfterLabel } from "@/lib/rate-limit-rules";
 import { safeCallbackUrl } from "@/lib/safe-callback";
-import { loginSchema, registerSchema } from "@/lib/validations/auth";
+import { loginSchema, registerSchema, registrationCodeSchema } from "@/lib/validations/auth";
 import { createCredentialsUser } from "./accounts";
-import { sendEmailCode } from "./email-verification";
+import { resendRegistrationCode, sendEmailCode } from "./email-verification";
 import { fieldErrorsFrom } from "./form-errors";
+import { notifyExistingAccount } from "./password-reset";
+import { generateResetToken, registrationTicket } from "./verification-code";
+import { authSecret } from "./verification-store";
 
 export type FormState = {
   error?: string;
@@ -41,7 +44,19 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   return {};
 }
 
-export async function registerAction(_prev: FormState, formData: FormData): Promise<FormState> {
+export type RegisterState = FormState & {
+  /** Paso 2: escribir el código. Se responde igual exista o no el correo. */
+  pending?: { email: string; ticket: string };
+  /** Se reenvió el código (o se fingió reenviarlo). */
+  resent?: boolean;
+};
+
+/**
+ * Crea la cuenta y envía un código al correo. Si el correo ya tenía cuenta, no lo dice: a ese correo le
+ * llega un aviso con un enlace para recuperar el acceso y aquí se responde igual que con uno nuevo.
+ * Los correos salen con `after()`, así el tiempo de respuesta tampoco delata cuál de los dos casos fue.
+ */
+export async function registerAction(_prev: RegisterState, formData: FormData): Promise<RegisterState> {
   const raw = Object.fromEntries(formData) as Record<string, string>;
   const values = { name: raw.name ?? "", email: raw.email ?? "", phone: raw.phone ?? "", whatsappOptIn: raw.whatsappOptIn ?? "" };
   const parsed = registerSchema.safeParse(raw);
@@ -50,34 +65,66 @@ export async function registerAction(_prev: FormState, formData: FormData): Prom
   }
   const { name, email, phone, password } = parsed.data;
 
-  // Antes de consultar el email, para que tampoco sirva para enumerar cuentas.
   const limit = await consumeRateLimit("register:ip", clientIp(await headers()));
   if (!limit.ok) {
     return { error: `Demasiados registros desde esta conexión. Inténtalo en ${retryAfterLabel(limit.retryAfterSec)}.`, values };
   }
 
   const created = await createCredentialsUser({ name, email, phone, password });
-  if (created === "email-taken") {
-    return { fieldErrors: { email: "Ya existe una cuenta con este correo. Inicia sesión." }, values };
+  // Por correo y en silencio: avisar "ya te enviamos varios" revelaría que el correo existe.
+  const mayEmail = (await consumeRateLimit("register:email", email)).ok;
+  if (mayEmail) {
+    after(async () => {
+      try {
+        if (created === "email-taken") await notifyExistingAccount(email);
+        else await sendEmailCode(created.id);
+      } catch (error) {
+        console.error("[email] no se pudo enviar el correo del registro", error);
+      }
+    });
   }
 
-  // El código del correo sale ya; si falla, la página de verificación permite pedir otro.
-  try {
-    await sendEmailCode(created.id);
-  } catch (error) {
-    console.error("[email] no se pudo enviar el código del registro", error);
-  }
+  const ticket = created === "email-taken" ? generateResetToken() : registrationTicket(created.id, email, authSecret());
+  return { pending: { email, ticket }, values };
+}
 
-  // Tras registrarse, se verifica una sola vez el correo y el celular; luego sigue a donde iba.
+/** Paso 2 del registro: el código del correo es el primer inicio de sesión. */
+export async function confirmRegistrationAction(prev: RegisterState, formData: FormData): Promise<RegisterState> {
+  const pending = prev.pending;
+  if (!pending) return prev;
+  const parsed = registrationCodeSchema.safeParse({ email: pending.email, ticket: pending.ticket, code: formData.get("code") ?? "" });
+  if (!parsed.success) return { ...prev, resent: false, error: "Escribe los 6 dígitos del código." };
+
   const next = redirectTarget(formData);
   try {
-    await signIn("credentials", { email, password, redirectTo: `/verificar?callbackUrl=${encodeURIComponent(next)}` });
+    await signIn("registration-code", { ...parsed.data, redirectTo: `/verificar?callbackUrl=${encodeURIComponent(next)}` });
   } catch (error) {
-    // La cuenta ya existe; si el login automático falla (p. ej. rate limit), que entre a mano.
-    if (error instanceof AuthError) redirect("/login");
+    if (error instanceof CredentialsSignin && error.code === RATE_LIMITED_CODE) {
+      return { ...prev, resent: false, error: "Demasiados intentos. Espera 15 minutos o pide un código nuevo." };
+    }
+    if (error instanceof AuthError) {
+      return { ...prev, resent: false, error: "El código no coincide o venció. Revisa el último correo que te enviamos o pide otro." };
+    }
     throw error; // redirect de éxito
   }
-  return {};
+  return prev;
+}
+
+/** "Reenviar código" desde el registro. Siempre responde lo mismo. */
+export async function resendRegistrationCodeAction(prev: RegisterState): Promise<RegisterState> {
+  const pending = prev.pending;
+  if (!pending) return prev;
+  const mayEmail = (await consumeRateLimit("register:email", pending.email)).ok;
+  if (mayEmail) {
+    after(async () => {
+      try {
+        await resendRegistrationCode(pending.email, pending.ticket);
+      } catch (error) {
+        console.error("[email] no se pudo reenviar el código del registro", error);
+      }
+    });
+  }
+  return { ...prev, error: undefined, resent: true };
 }
 
 export async function signOutAction() {

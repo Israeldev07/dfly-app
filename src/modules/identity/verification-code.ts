@@ -53,3 +53,18 @@ export function hashResetToken(token: string, secret: string) {
 export function isResetTokenShape(token: unknown): token is string {
   return typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token);
 }
+
+/**
+ * Ticket del registro: lo recibe quien acaba de crear la cuenta y es lo único que permite reenviar el
+ * código y entrar con él desde el formulario de registro. Si el correo ya tenía cuenta se entrega uno
+ * aleatorio (misma forma), así la respuesta no delata nada y nadie entra a una cuenta ajena con el código.
+ */
+export function registrationTicket(userId: string, email: string, secret: string) {
+  return createHmac("sha256", secret).update(`register:${userId}:${email}`).digest("base64url");
+}
+
+export function ticketMatches(ticket: string, userId: string, email: string, secret: string) {
+  const a = Buffer.from(ticket);
+  const b = Buffer.from(registrationTicket(userId, email, secret));
+  return a.length === b.length && timingSafeEqual(a, b);
+}

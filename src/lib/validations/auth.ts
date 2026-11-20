@@ -38,6 +38,13 @@ export const registerSchema = z.object({
   whatsappOptIn: z.literal("on", { error: "Necesitamos tu permiso para avisarte por WhatsApp" }),
 });
 
+/** Código del correo para entrar por primera vez tras registrarse. */
+export const registrationCodeSchema = z.object({
+  email: emailSchema,
+  ticket: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  code: z.string().transform((v) => v.replace(/\D/g, "")).pipe(z.string().regex(/^\d{6}$/, "Escribe los 6 dígitos del código")),
+});
+
 export const forgotPasswordSchema = z.object({ email: emailSchema });
 
 export const resetPasswordSchema = z

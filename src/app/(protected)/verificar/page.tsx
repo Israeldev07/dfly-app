@@ -11,7 +11,8 @@ import { requireUser } from "@/modules/identity/session";
 export const metadata: Metadata = { title: "Verifica tu cuenta" };
 
 /**
- * Se llega aquí al registrarse. Se confirma una sola vez que el correo y el celular son del cliente;
+ * Se llega aquí al registrarse (el correo ya quedó verificado con el código del registro). Se confirma
+ * una sola vez que el correo y el celular son del cliente;
  * sin eso puede navegar y armar su carrito, pero no pedir.
  */
 export default async function VerifyPage({ searchParams }: PageProps<"/verificar">) {
@@ -29,13 +30,15 @@ export default async function VerifyPage({ searchParams }: PageProps<"/verificar
         <p className="max-w-[60ch] text-[15px] text-ink-soft">
           {v.verified
             ? "Ya puedes hacer tus pedidos. No tendrás que repetir esto."
-            : "Te pedimos dos códigos, uno por correo y otro por WhatsApp, para asegurarnos de que tus datos son correctos. Se hace una sola vez."}
+            : v.emailVerified
+              ? "Tu correo ya está confirmado. Falta tu celular: te enviaremos un código por WhatsApp. Se hace una sola vez."
+              : "Te pedimos dos códigos, uno por correo y otro por WhatsApp, para asegurarnos de que tus datos son correctos. Se hace una sola vez."}
         </p>
       </div>
 
       <ol className="flex flex-col gap-5">
         <Step n={1} title="Tu correo" done={v.emailVerified}>
-          <EmailVerification email={v.email} verified={v.emailVerified} codeAlreadySent={!v.emailVerified} />
+          <EmailVerification email={v.email} verified={v.emailVerified} />
         </Step>
         <Step n={2} title="Tu celular" done={v.phoneVerified}>
           <PhoneVerification phone={v.phone ?? ""} verified={v.phoneVerified} pendingPhone={v.pendingPhone} />

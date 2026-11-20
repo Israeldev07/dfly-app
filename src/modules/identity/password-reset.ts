@@ -2,7 +2,7 @@ import "server-only";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { appUrl, sendEmail } from "@/lib/email";
-import { passwordResetMessage } from "./emails";
+import { accountExistsMessage, passwordResetMessage } from "./emails";
 import { generateResetToken, hashResetToken, isResetTokenShape, RESET_TOKEN_TTL_MIN } from "./verification-code";
 import { authSecret } from "./verification-store";
 
@@ -13,23 +13,39 @@ import { authSecret } from "./verification-store";
 export async function requestPasswordReset(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, email: true } });
   if (!user) return;
+  const link = await issueResetLink(user.id, user.email);
+  await sendEmail(passwordResetMessage(user.email, user.name, link));
+}
 
+/**
+ * Alguien intentó registrarse con un correo que ya tiene cuenta. Se avisa a ese correo (no a quien
+ * llenó el formulario) con un enlace para recuperar el acceso; el formulario responde lo mismo que
+ * con un correo nuevo, así el registro no revela qué correos están registrados.
+ */
+export async function notifyExistingAccount(email: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, email: true } });
+  if (!user) return;
+  const link = await issueResetLink(user.id, user.email);
+  await sendEmail(accountExistsMessage(user.email, user.name, link));
+}
+
+/** Crea un enlace de recuperación (invalida el anterior) y devuelve la URL. */
+async function issueResetLink(userId: string, email: string): Promise<string> {
   const token = generateResetToken();
   const data = {
-    target: user.email,
+    target: email,
     codeHash: hashResetToken(token, authSecret()),
     expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60_000),
     attempts: 0,
   };
   // Uno vigente por cuenta: pedir otro invalida el enlace anterior.
   await prisma.verificationCode.upsert({
-    where: { userId_purpose: { userId: user.id, purpose: "PASSWORD_RESET" } },
-    create: { userId: user.id, purpose: "PASSWORD_RESET", ...data },
+    where: { userId_purpose: { userId, purpose: "PASSWORD_RESET" } },
+    create: { userId, purpose: "PASSWORD_RESET", ...data },
     update: data,
     select: { id: true },
   });
-  const link = `${appUrl()}/recuperar/nueva?token=${encodeURIComponent(token)}`;
-  await sendEmail(passwordResetMessage(user.email, user.name, link));
+  return `${appUrl()}/recuperar/nueva?token=${encodeURIComponent(token)}`;
 }
 
 /** ¿El enlace sigue sirviendo? Lo usa la página para no mostrar el formulario a un enlace vencido. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailCodeMessage, passwordResetMessage } from "./emails";
+import { accountExistsMessage, emailCodeMessage, passwordResetMessage } from "./emails";
 
 describe("correo con el código", () => {
   it("lleva el código y saluda por el primer nombre", () => {
@@ -25,5 +25,16 @@ describe("correo de recuperación", () => {
     expect(m.text).toContain("Hola,");
     expect(m.text).toContain("30 minutos");
     expect(m.html).toContain('href="https://dfly.app/recuperar/nueva?token=abc"');
+  });
+});
+
+describe("aviso de cuenta existente", () => {
+  it("avisa al dueño y le da el enlace para recuperar el acceso", () => {
+    const link = "https://dfly.app/recuperar/nueva?token=xyz";
+    const m = accountExistsMessage("ana@mail.com", "Ana", link);
+    expect(m.to).toBe("ana@mail.com");
+    expect(m.text).toContain("ya tienes una");
+    expect(m.text).toContain(link);
+    expect(m.html).toContain(`href="${link}"`);
   });
 });

@@ -59,7 +59,7 @@ export function EmailVerification({ email, verified: initialVerified, codeAlread
     return (
       <p role="status" className="flex items-center gap-2 text-[15px]">
         <CheckCircle2 aria-hidden className="size-[18px] flex-none text-route-deep" strokeWidth={2.25} />
-        <span className="min-w-0 break-all">
+        <span className="min-w-0 [overflow-wrap:anywhere]">
           <span className="font-semibold">{email}</span>
           <span className="text-ink-soft"> · verificado</span>
         </span>
@@ -72,7 +72,7 @@ export function EmailVerification({ email, verified: initialVerified, codeAlread
       <div className="flex flex-col gap-4">
         <FormError message={sendError} />
         <p className="text-[15px] leading-relaxed">
-          Te enviaremos un código de 6 dígitos a <span className="font-semibold break-all">{email}</span>.
+          Te enviaremos un código de 6 dígitos a <span className="font-semibold [overflow-wrap:anywhere]">{email}</span>.
         </p>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <button
@@ -103,7 +103,7 @@ export function EmailVerification({ email, verified: initialVerified, codeAlread
         error={state.error}
         hint={
           <>
-            {resent ? "Te enviamos uno nuevo" : "Lo enviamos"} a <span className="break-all">{email}</span>. Vence en 15
+            {resent ? "Te enviamos uno nuevo" : "Lo enviamos"} a <span className="[overflow-wrap:anywhere]">{email}</span>. Vence en 15
             minutos; si no llega, revisa la carpeta de spam.
           </>
         }

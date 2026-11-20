@@ -10,6 +10,10 @@ export const RATE_LIMITS = {
   /** Intentos de login por email: frena fuerza bruta contra una cuenta. */
   "login:email": { limit: 8, windowSec: 15 * 60, blockSec: 15 * 60 },
   "register:ip": { limit: 5, windowSec: 60 * 60 },
+  /** Correos que salen al registrarse (código o aviso de cuenta existente) por dirección. Se aplica en silencio. */
+  "register:email": { limit: 3, windowSec: 60 * 60 },
+  /** Intentos de entrar con el código del registro, por correo (además de `login:ip`). */
+  "register-code:email": { limit: 10, windowSec: 15 * 60, blockSec: 15 * 60 },
   /** Cada pedido genera mensajes de WhatsApp al dueño y al comercio. */
   "order:user": { limit: 5, windowSec: 10 * 60 },
   /** Códigos al correo de la cuenta. */

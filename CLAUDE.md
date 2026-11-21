@@ -79,7 +79,7 @@ Invariantes:
 
 **Carrito**: estado cliente con Zustand persistido (`ordering/cart-store.ts`), un solo comercio por carrito; en el checkout los precios del cliente se ignoran.
 
-**Catálogo real**: fuente, el catálogo de WhatsApp Business de Dfly (sin promociones temporales ni productos sin precio). `prisma/import-catalog.ts` hace upsert del comercio por `slug` (nombre, descripción, WhatsApp; no toca sector, tiempo de entrega, visibilidad ni imagen, que se ajustan en `/admin`) y del producto por nombre dentro del comercio (precio y descripción); nunca borra.
+**Catálogo real**: fuente, el catálogo de WhatsApp Business de Dfly (sin promociones temporales ni productos sin precio). `prisma/import-catalog.ts` crea el comercio por `slug` si no existe y, si existe, no lo toca (nombre, descripción, WhatsApp, sector, tiempo de entrega, visibilidad e imagen se ajustan en `/admin`; solo avisa si el WhatsApp difiere del catálogo). Por producto (nombre dentro del comercio) crea los nuevos y en los existentes actualiza el precio (lo muestra) y la descripción solo si el catálogo trae una; nunca borra.
 
 **Acompañantes y extras**: `ProductOptionGroup` (con `minSelect`/`maxSelect`) y `ProductOption` (`priceDeltaCents` libre). `catalog/options.ts#priceSelection` (puro) valida la selección y calcula el precio; el checkout lo ejecuta con datos de la BD y guarda en `OrderItem` el precio unitario con extras y `optionsSummary` (texto que ve el comercio en WhatsApp). En el carrito, una línea = producto + opciones (`lineKey`). Al editar, `admin/product-options.ts#syncOptionGroups` conserva los ids existentes para no invalidar carritos abiertos.
 

@@ -40,8 +40,7 @@ export function CheckoutForm({ deliveryFeeCents, phoneVerified, emailVerified, d
     return next;
   }, {});
   const fe = state.fieldErrors ?? {};
-  const v = { ...defaults, notes: "", paymentMethod: "CASH", ageConfirmed: "", ...state.values };
-  const ageConfirmed = v.ageConfirmed === "on";
+  const v = { ...defaults, notes: "", paymentMethod: "CASH", ...state.values };
   const feeCents = state.deliveryFeeCents ?? deliveryFeeCents;
 
   const storeId = store?.id;
@@ -212,23 +211,6 @@ export function CheckoutForm({ deliveryFeeCents, phoneVerified, emailVerified, d
         </dl>
 
         <CartChangesNotice changes={changes} />
-
-        {store.category === "LIQUOR" ? (
-          <div className="flex flex-col gap-1.5">
-            <label className="flex cursor-pointer items-start gap-3 text-[14px] leading-snug">
-              <input
-                type="checkbox"
-                name="ageConfirmed"
-                defaultChecked={ageConfirmed}
-                key={String(ageConfirmed)}
-                aria-invalid={fe.ageConfirmed ? true : undefined}
-                className="mt-0.5 size-5 flex-none accent-route-deep"
-              />
-              Confirmo que soy mayor de 18 años.
-            </label>
-            {fe.ageConfirmed ? <p className="pl-8 text-[13.5px] font-medium text-brand-deep">{fe.ageConfirmed}</p> : null}
-          </div>
-        ) : null}
 
         <SubmitButton pendingLabel="Enviando tu pedido…" disabled={blocker !== null}>
           Hacer pedido · {formatUsd(totalCents)}

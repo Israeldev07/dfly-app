@@ -34,7 +34,7 @@ export type CheckoutState = {
   deliveryFeeCents?: number;
 };
 
-const KEPT_FIELDS = ["addressLine", "sector", "reference", "notes", "paymentMethod", "ageConfirmed"] as const;
+const KEPT_FIELDS = ["addressLine", "sector", "reference", "notes", "paymentMethod"] as const;
 
 /** Productos disponibles (con precio y opciones de la BD) de un comercio activo. */
 function availableProducts(storeId: string, productIds: string[]): Promise<ProductWithOptions[]> {
@@ -101,10 +101,6 @@ export async function createOrderAction(_prev: CheckoutState, formData: FormData
     select: { id: true, name: true, category: true, city: true, whatsappPhone: true },
   });
   if (!store) return { error: "Este comercio ya no está disponible.", values };
-
-  if (store.category === "LIQUOR" && input.ageConfirmed !== "on") {
-    return { fieldErrors: { ageConfirmed: "Debes confirmar que eres mayor de 18 años." }, values };
-  }
 
   // Precios SIEMPRE desde la base de datos, nunca desde el navegador.
   const products = await availableProducts(store.id, input.items.map((i) => i.productId));

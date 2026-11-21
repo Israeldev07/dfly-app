@@ -60,8 +60,7 @@ export default async function StorePage({ params }: PageProps<"/comercios/[slug]
       )}
       {store.category === "LIQUOR" ? (
         <p className="text-[13.5px] text-ink-soft">
-          Venta solo a mayores de 18 años. Te pediremos confirmarlo al hacer el pedido.
-        </p>
+          Venta solo a mayores de 18 años.        </p>
       ) : null}
     </main>
   );

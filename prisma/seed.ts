@@ -89,22 +89,41 @@ const stores = [
   },
 ];
 
+/**
+ * Crea el admin. Los comercios de ejemplo solo con SEED_DEMO_STORES="true" (para
+ * desarrollo local): sus WhatsApp son ficticios y no deben verlos clientes reales.
+ */
 async function main() {
+  await seedAdmin();
+  if (process.env.SEED_DEMO_STORES === "true") await seedDemoStores();
+  console.log("Seed OK.");
+}
+
+/**
+ * Solo crea lo que falta: se puede volver a ejecutar sin pisar lo editado en /admin.
+ * Un comercio que ya existe no se toca, y un producto se crea solo si su comercio no
+ * tiene otro con el mismo nombre. Nunca actualiza ni borra.
+ */
+async function seedDemoStores() {
+  let createdStores = 0;
+  let createdProducts = 0;
   for (const { products, ...store } of stores) {
-    const saved = await prisma.store.upsert({
-      where: { slug: store.slug },
-      update: store,
-      create: store,
-    });
-    await prisma.product.deleteMany({ where: { storeId: saved.id, orderItems: { none: {} } } });
-    await prisma.product.createMany({
-      data: products.map((p) => ({ ...p, storeId: saved.id })),
-      skipDuplicates: true,
-    });
+    let saved = await prisma.store.findUnique({ where: { slug: store.slug }, select: { id: true } });
+    if (!saved) {
+      saved = await prisma.store.create({ data: store, select: { id: true } });
+      createdStores++;
+    }
+
+    const existing = await prisma.product.findMany({ where: { storeId: saved.id }, select: { name: true } });
+    const names = new Set(existing.map((p) => p.name.toLowerCase()));
+    const missing = products.filter((p) => !names.has(p.name.toLowerCase()));
+    if (missing.length) {
+      await prisma.product.createMany({ data: missing.map((p) => ({ ...p, storeId: saved.id })) });
+      createdProducts += missing.length;
+    }
   }
 
-  await seedAdmin();
-  console.log(`Seed OK: ${stores.length} comercios`);
+  console.log(`Ejemplo: ${createdStores} comercios y ${createdProducts} productos nuevos.`);
 }
 
 /**

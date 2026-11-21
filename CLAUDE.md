@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 App de delivery para **Otavalo (Ecuador)**: USD en centavos, celulares +593. Categorías: Restaurantes, Market, Farmacia, Licores y Mascotas. Flujo de pedidos: cliente → WhatsApp del dueño (datos completos) → comercio (solo productos, botones Aceptar/Rechazar) → confirmación al dueño y al cliente. Vía WhatsApp Cloud API con patrón outbox. Contexto de producto en `PRODUCT.md`; diseño de referencia en `Dfly Home v2.dc.html`.
 
-Hecho: auth (email + contraseña, verificación de correo y celular por código, recuperación de contraseña), catálogo, carrito, checkout, pedidos con estado en vivo, perfil, y mensajería (builders, outbox con reintentos, webhook firmado, crons). Sin credenciales de Meta, los mensajes se registran en la consola del servidor (`[whatsapp:dev]`). Backoffice en `/admin` (resumen del día, pedidos con cancelar/reintentar mensajes, comercios y productos). Catálogo real de restaurantes en `prisma/data/catalogo-otavalo.ts` (6 comercios con menú; `Store.whatsappPhone` es obligatorio porque ahí llegan los pedidos, así que los restaurantes del directorio quedan en `pendingStores` hasta tener número). El admin sube fotos de comercios y productos y define acompañantes/extras por producto. Pendiente: proyecto de Supabase para las fotos en producción, WhatsApp y menú de esos restaurantes, comercios de Market/Farmacia/Licores/Mascotas (hoy solo los ficticios del seed).
+Hecho: auth (email + contraseña, verificación de correo y celular por código, recuperación de contraseña), catálogo, carrito, checkout, pedidos con estado en vivo, perfil, y mensajería (builders, outbox con reintentos, webhook firmado, crons). Sin credenciales de Meta, los mensajes se registran en la consola del servidor (`[whatsapp:dev]`). Backoffice en `/admin` (resumen del día, pedidos con cancelar/reintentar mensajes, comercios y productos). Catálogo real de restaurantes en `prisma/data/catalogo-otavalo.ts` (6 comercios con menú; `Store.whatsappPhone` es obligatorio porque ahí llegan los pedidos, así que los restaurantes del directorio quedan en `pendingStores` hasta tener número). El admin sube fotos de comercios y productos y define acompañantes/extras por producto. Pendiente: proyecto de Supabase para las fotos en producción, WhatsApp y menú de esos restaurantes, comercios de Market/Farmacia/Licores/Mascotas (hoy solo los ficticios del seed, que se crean con `SEED_DEMO_STORES="true"`).
 
 ## Comandos
 
@@ -23,7 +23,7 @@ Hecho: auth (email + contraseña, verificación de correo y celular por código,
 | Generar cliente Prisma | `npm run db:generate` (requiere `DIRECT_URL` en `.env`) |
 | Nueva migración (local) | `npm run db:migrate -- --name <nombre>` |
 | Migraciones (producción) | `npm run db:deploy` |
-| Seed | `npm run db:seed` |
+| Seed: crea el admin; con `SEED_DEMO_STORES="true"`, también los comercios de ejemplo (solo crea lo que falta, no pisa ni borra) | `npm run db:seed` |
 | Importar catálogo real (idempotente) | `npm run db:import-catalog` |
 | Explorar datos | `npm run db:studio` |
 

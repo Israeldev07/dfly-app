@@ -1,15 +1,34 @@
 import { z } from "zod";
+import { lineKey } from "@/modules/catalog/options";
+
+/** Igual que `MAX_QTY` del carrito: por línea (producto + opciones elegidas). */
+const MAX_QTY = 50;
+const MAX_QTY_MESSAGE = `Máximo ${MAX_QTY} unidades por producto`;
 
 const cartItemsSchema = z
   .array(
     z.object({
       productId: z.string().min(1).max(40),
-      quantity: z.number().int().min(1, "Cantidad inválida").max(50, "Máximo 50 unidades por producto"),
+      quantity: z.number().int().min(1, "Cantidad inválida").max(MAX_QTY, MAX_QTY_MESSAGE),
       optionIds: z.array(z.string().min(1).max(40)).max(30).default([]),
     }),
   )
   .min(1, "Tu carrito está vacío")
-  .max(40, "Demasiados productos en un solo pedido");
+  .max(40, "Demasiados productos en un solo pedido")
+  // El carrito junta en una línea el mismo producto con las mismas opciones; repetir la línea
+  // (solo manipulando el envío) no debe servir para saltarse el tope.
+  .superRefine((items, ctx) => {
+    const totals = new Map<string, number>();
+    for (const item of items) {
+      const key = lineKey(item.productId, item.optionIds);
+      const total = (totals.get(key) ?? 0) + item.quantity;
+      totals.set(key, total);
+      if (total > MAX_QTY) {
+        ctx.addIssue({ code: "custom", message: MAX_QTY_MESSAGE });
+        return;
+      }
+    }
+  });
 
 export const checkoutSchema = z.object({
   storeId: z.string().min(1).max(40),

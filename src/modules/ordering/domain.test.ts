@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { ecuadorMobileSchema } from "@/lib/validations/auth";
+import { extractButtonTaps } from "@/modules/messaging/webhook";
 import {
   canTransition,
   computeTotals,
@@ -117,5 +119,53 @@ describe("remitente de la respuesta del comercio", () => {
   it("rechaza si el pedido no salió a ningún número o el remitente está vacío", () => {
     expect(isStoreSender("593991111111", [])).toBe(false);
     expect(isStoreSender("", [""])).toBe(false);
+  });
+});
+
+describe("remitente con un webhook real de Meta", () => {
+  // Cuerpo tal como lo envía Meta al pulsar un botón de plantilla: `from` y `wa_id` llevan el
+  // número en dígitos, con código de país y sin "+".
+  const metaWebhook = (from: string) => ({
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "102290129340398",
+        changes: [
+          {
+            field: "messages",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: { display_phone_number: "593987654321", phone_number_id: "106540352242922" },
+              contacts: [{ profile: { name: "Alitas Terra Nova" }, wa_id: from }],
+              messages: [
+                {
+                  context: { from: "593987654321", id: "wamid.HBgMNTkzOTg3NjU0MzIxFQIAERgSQ1RYAA==" },
+                  from,
+                  id: "wamid.HBgMNTkzOTkxMjM0NTY3FQIAEhgUM0VCMDRBQUI2NjZBQjVDRDQ5QzMA",
+                  timestamp: "1763650000",
+                  type: "button",
+                  button: { payload: "o:abc:a:firma", text: "Aceptar" },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  // Como lo escribe el admin en /admin ("099 123 4567") y lo guarda ecuadorMobileSchema.
+  const stored = ecuadorMobileSchema.parse("099 123 4567");
+
+  it("reconoce el número del comercio guardado desde /admin", () => {
+    expect(stored).toBe("+593991234567");
+    const [tap] = extractButtonTaps(metaWebhook("593991234567"), "106540352242922");
+    expect(tap?.from).toBe("593991234567");
+    expect(isStoreSender(tap!.from, [stored])).toBe(true);
+  });
+
+  it("no reconoce a otro número que pulse un botón reenviado", () => {
+    const [tap] = extractButtonTaps(metaWebhook("593998887777"), "106540352242922");
+    expect(isStoreSender(tap!.from, [stored])).toBe(false);
   });
 });

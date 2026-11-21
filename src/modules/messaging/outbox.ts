@@ -85,6 +85,8 @@ export async function dispatchOutbox({ orderId, limit = 25, onSent }: { orderId?
             where: { id: msg.id },
             data: {
               partsSent: i + 1,
+              // El número real de salida: si el `to` se cambió mientras salía, queda registrado a quién llegó.
+              to: msg.to,
               // Se guarda el id del primero, el que lleva los botones si los hay.
               ...(i === 0 ? { waMessageId: id } : {}),
               // Sin cambiar el estado si se canceló mientras salía: `onSent` decide qué avisar.

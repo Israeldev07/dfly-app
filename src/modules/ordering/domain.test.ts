@@ -5,6 +5,7 @@ import {
   customerCanCancelNow,
   customerCanRequestCancel,
   generatePublicCode,
+  isStoreSender,
   lateReplyState,
   storeReplyMustRetry,
 } from "./domain";
@@ -97,5 +98,24 @@ describe("generatePublicCode", () => {
     for (let i = 0; i < 200; i++) {
       expect(generatePublicCode()).toMatch(/^[2-9A-HJKMNP-Z]{5}$/);
     }
+  });
+});
+
+describe("remitente de la respuesta del comercio", () => {
+  it("acepta el número al que salió el pedido, con o sin + (el wa_id de Meta no lo trae)", () => {
+    expect(isStoreSender("593991234567", ["+593991234567"])).toBe(true);
+  });
+
+  it("acepta cualquiera de los números a los que salió el pedido", () => {
+    expect(isStoreSender("593992222222", ["+593991111111", "+593992222222"])).toBe(true);
+  });
+
+  it("rechaza un número al que no salió el pedido (p. ej. el nuevo del comercio)", () => {
+    expect(isStoreSender("593992222222", ["+593991111111"])).toBe(false);
+  });
+
+  it("rechaza si el pedido no salió a ningún número o el remitente está vacío", () => {
+    expect(isStoreSender("593991111111", [])).toBe(false);
+    expect(isStoreSender("", [""])).toBe(false);
   });
 });

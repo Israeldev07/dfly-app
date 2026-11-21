@@ -17,6 +17,8 @@ import { assertAdmin } from "@/modules/identity/session";
 import { dispatchOrderMessages } from "@/modules/ordering/dispatch";
 import { cancelOrderByAdmin } from "@/modules/ordering/cancel";
 import { rejectCancellationRequest } from "@/modules/ordering/cancel-requests";
+import { phoneDigits } from "@/modules/ordering/domain";
+import { redirectUnsentStoreRequests } from "@/modules/ordering/store-contact";
 import { canRetryMessage, slugify } from "./domain";
 import { syncOptionGroups } from "./product-options";
 
@@ -116,7 +118,7 @@ export async function saveStoreAction(_prev: AdminFormState, formData: FormData)
   const storeId = formData.get("storeId");
   const editingId = typeof storeId === "string" && storeId ? idSchema.parse(storeId) : null;
   const previous = editingId
-    ? await prisma.store.findUnique({ where: { id: editingId }, select: { imageUrl: true } })
+    ? await prisma.store.findUnique({ where: { id: editingId }, select: { imageUrl: true, whatsappPhone: true } })
     : null;
 
   const image = await imageFromForm(formData, "stores", previous?.imageUrl ?? null);
@@ -124,7 +126,12 @@ export async function saveStoreAction(_prev: AdminFormState, formData: FormData)
 
   if (editingId) {
     // El slug no cambia al editar: es la URL pública del comercio.
-    await prisma.store.update({ where: { id: editingId }, data: { ...parsed.data, imageUrl: image.url }, select: { id: true } });
+    const phoneChanged = previous !== null && phoneDigits(previous.whatsappPhone) !== phoneDigits(parsed.data.whatsappPhone);
+    await prisma.$transaction(async (tx) => {
+      await tx.store.update({ where: { id: editingId }, data: { ...parsed.data, imageUrl: image.url }, select: { id: true } });
+      // Los pedidos que aún no le salieron van al número nuevo; los ya enviados siguen con el que los recibió.
+      if (phoneChanged) await redirectUnsentStoreRequests(tx, editingId, parsed.data.whatsappPhone);
+    });
     if (image.replaced) after(() => deleteImage(image.replaced));
     refresh();
     return { ok: true, values };

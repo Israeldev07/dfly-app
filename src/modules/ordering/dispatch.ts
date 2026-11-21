@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { storeCancelledMessage } from "@/modules/messaging/messages";
 import { dispatchOutbox, enqueue, type OnSent } from "@/modules/messaging/outbox";
+import { storeNoticeRecipient } from "./store-contact";
 import { transitionOrder } from "./transitions";
 
 /** Efectos en el pedido cuando sale un mensaje. Corre en la transacción que lo marca SENT. */
@@ -35,7 +36,7 @@ async function noticeStoreIfCancelledInFlight(tx: Prisma.TransactionClient, orde
     tx,
     orderId,
     "STORE_CANCELLED",
-    order.store.whatsappPhone,
+    await storeNoticeRecipient(tx, orderId, order.store.whatsappPhone),
     storeCancelledMessage({ publicCode: order.publicCode, storeName: order.store.name }),
   );
 }

@@ -9,6 +9,7 @@ import {
 } from "@/modules/messaging/messages";
 import { adminPhone, enqueue } from "@/modules/messaging/outbox";
 import { canTransition, customerCanCancelNow, customerCanRequestCancel } from "./domain";
+import { storeNoticeRecipient } from "./store-contact";
 import { transitionOrder } from "./transitions";
 
 const cancelSelect = {
@@ -55,7 +56,7 @@ async function applyCancellation(
       tx,
       order.id,
       "STORE_CANCELLED",
-      order.store.whatsappPhone,
+      await storeNoticeRecipient(tx, order.id, order.store.whatsappPhone),
       storeCancelledMessage({ publicCode: order.publicCode, storeName: order.store.name }),
     );
   }

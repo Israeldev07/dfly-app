@@ -51,7 +51,19 @@ export function customerCanRequestCancel(status: OrderStatus) {
   return status === "ACCEPTED";
 }
 
-export type PricedLine = { unitPriceCents: number; quantity: number };
+export const phoneDigits = (phone: string) => phone.replace(/\D/g, "");
+
+/**
+ * Solo puede responder por un pedido el número al que se le envió (el `to` de su STORE_REQUEST):
+ * ahí llegaron los botones. No se compara con el número actual del comercio porque el admin
+ * puede cambiarlo con el pedido en curso.
+ */
+export function isStoreSender(fromPhone: string, recipients: readonly string[]) {
+  const from = phoneDigits(fromPhone);
+  return from.length > 0 && recipients.some((to) => phoneDigits(to) === from);
+}
+
+export type PricedLine ={ unitPriceCents: number; quantity: number };
 
 export function computeTotals(lines: PricedLine[], deliveryFeeCents: number) {
   const subtotalCents = lines.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);

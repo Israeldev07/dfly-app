@@ -10,10 +10,9 @@ import {
   storeLateResponseMessage,
 } from "@/modules/messaging/messages";
 import { adminPhone, enqueue } from "@/modules/messaging/outbox";
-import { lateReplyState, storeReplyMustRetry } from "./domain";
+import { isStoreSender, lateReplyState, storeReplyMustRetry } from "./domain";
+import { storeNoticeRecipient, storeRequestRecipients } from "./store-contact";
 import { transitionOrder } from "./transitions";
-
-const digits = (phone: string) => phone.replace(/\D/g, "");
 
 /**
  * El comercio respondió antes de que quedara registrado el envío de su pedido (sigue en PENDING).
@@ -55,8 +54,11 @@ export async function applyStoreResponse(
     },
   });
   if (!order) return "not-found";
-  // Solo el número registrado del comercio puede responder por ese pedido.
-  if (digits(order.store.whatsappPhone) !== digits(fromPhone)) return "wrong-sender";
+  // Solo el número que recibió el pedido puede responder por él (aunque luego se cambiara el del comercio).
+  if (!isStoreSender(fromPhone, await storeRequestRecipients(prisma, orderId))) {
+    console.warn(`[webhook] pedido ${order.publicCode}: respuesta ignorada, el remitente no es el número que recibió el pedido`);
+    return "wrong-sender";
+  }
 
   const accepted = action === "accept";
   const ownerPhone = adminPhone();
@@ -85,7 +87,7 @@ export async function applyStoreResponse(
             tx,
             orderId,
             "STORE_LATE_RESPONSE",
-            order.store.whatsappPhone,
+            await storeNoticeRecipient(tx, orderId, order.store.whatsappPhone),
             storeLateResponseMessage({ publicCode: order.publicCode, storeName: order.store.name }, lateState),
           );
         }
@@ -151,7 +153,7 @@ export async function expireStaleOrders() {
           tx,
           order.id,
           "STORE_LATE_RESPONSE",
-          order.store.whatsappPhone,
+          await storeNoticeRecipient(tx, order.id, order.store.whatsappPhone),
           storeLateResponseMessage({ publicCode: order.publicCode, storeName: order.store.name }, "EXPIRED"),
         );
       }

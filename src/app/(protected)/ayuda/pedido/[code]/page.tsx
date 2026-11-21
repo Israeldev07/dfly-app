@@ -10,7 +10,7 @@ import { STATUS_COPY } from "@/modules/ordering/status-copy";
 
 export async function generateMetadata({ params }: PageProps<"/ayuda/pedido/[code]">): Promise<Metadata> {
   const { code } = await params;
-  return { title: `Ayuda con el pedido #${code}` };
+  return { title: `Ayuda con el pedido #${code.toUpperCase()}` };
 }
 
 export default async function HelpOrderPage({ params }: PageProps<"/ayuda/pedido/[code]">) {

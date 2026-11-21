@@ -12,7 +12,7 @@ import { requireAdmin } from "@/modules/identity/session";
 
 export async function generateMetadata({ params }: PageProps<"/admin/pedidos/[code]">): Promise<Metadata> {
   const { code } = await params;
-  return { title: `Pedido #${code}` };
+  return { title: `Pedido #${code.toUpperCase()}` };
 }
 
 const previewText = (value: unknown) =>

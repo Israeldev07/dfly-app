@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { OrderStatus } from "@/generated/prisma/enums";
@@ -119,7 +120,8 @@ export function listStoreOptions() {
   return prisma.store.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 }
 
-export function getAdminStore(id: string) {
+/** Con `cache`: `generateMetadata` y la página la piden en la misma petición y se consulta una vez. */
+export const getAdminStore = cache((id: string) => {
   return prisma.store.findUnique({
     where: { id },
     select: {
@@ -147,7 +149,7 @@ export function getAdminStore(id: string) {
       },
     },
   });
-}
+});
 
 export function getAdminProduct(id: string) {
   return prisma.product.findUnique({

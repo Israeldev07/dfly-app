@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import type { StoreCategory } from "@/generated/prisma/enums";
 
@@ -36,7 +37,8 @@ export async function listStores(category?: StoreCategory) {
   });
 }
 
-export async function getStoreWithProducts(slug: string) {
+/** Con `cache`: `generateMetadata` y la página la piden en la misma petición y se consulta una vez. */
+export const getStoreWithProducts = cache(async (slug: string) => {
   return prisma.store.findFirst({
     where: { slug, isActive: true },
     select: {
@@ -55,6 +57,6 @@ export async function getStoreWithProducts(slug: string) {
       },
     },
   });
-}
+});
 
 export type PublicStore = Awaited<ReturnType<typeof listStores>>[number];

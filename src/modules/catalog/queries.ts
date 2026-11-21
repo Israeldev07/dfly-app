@@ -27,10 +27,11 @@ export const optionGroupsSelect = {
   },
 } as const;
 
+/** Comercios visibles en el listado: activos y con al menos un producto disponible para pedir. */
 export async function listStores(category?: StoreCategory) {
   return prisma.store.findMany({
-    where: { isActive: true, ...(category ? { category } : {}) },
-    select: { ...publicStoreSelect, _count: { select: { products: { where: { isAvailable: true } } } } },
+    where: { isActive: true, products: { some: { isAvailable: true } }, ...(category ? { category } : {}) },
+    select: publicStoreSelect,
     orderBy: [{ etaMinutes: "asc" }, { name: "asc" }],
   });
 }

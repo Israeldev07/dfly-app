@@ -87,6 +87,25 @@ export const optionGroupsSchema = z
     }
   })
   .pipe(z.array(groupInputSchema).max(MAX_GROUPS, `Máximo ${MAX_GROUPS} grupos por producto`))
+  // El editor nunca repite ids; si llegan repetidos (JSON manipulado), syncOptionGroups
+  // editaría dos veces el mismo grupo y fallaría al buscar opciones que ya borró.
+  .superRefine((groups, ctx) => {
+    const groupIds = new Set<string>();
+    const optionIds = new Set<string>();
+    groups.forEach((g, i) => {
+      if (g.id) {
+        if (groupIds.has(g.id)) ctx.addIssue({ code: "custom", message: "grupo repetido; recarga la página", path: [i] });
+        groupIds.add(g.id);
+      }
+      g.options.forEach((o, j) => {
+        if (!o.id) return;
+        if (optionIds.has(o.id)) {
+          ctx.addIssue({ code: "custom", message: "opción repetida; recarga la página", path: [i, "options", j] });
+        }
+        optionIds.add(o.id);
+      });
+    });
+  })
   .transform((groups) =>
     groups.map((g) => ({
       id: g.id,

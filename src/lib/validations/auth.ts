@@ -20,13 +20,15 @@ export function stripEcuadorPrefix(phone: string) {
 }
 
 /**
- * Celular de Ecuador: se acepta "0991234567", "991234567" o "+593991234567".
+ * Celular de Ecuador (solo Ecuador): se acepta "0991234567", "991234567" o "+593991234567".
  * Se normaliza a E.164 (+5939XXXXXXXX), que es el formato que exige WhatsApp.
  */
 export const ecuadorMobileSchema = z
   .string()
   .trim()
-  .transform((v) => stripEcuadorPrefix(v.replace(/[\s()-]/g, "")))
+  .transform((v) => v.replace(/[\s()-]/g, ""))
+  .refine((v) => !v.startsWith("+") || v.startsWith("+593"), "Solo se aceptan celulares de Ecuador (+593)")
+  .transform(stripEcuadorPrefix)
   .pipe(z.string().regex(/^9\d{8}$/, "Ingresa un celular válido (ej. 099 123 4567)"))
   .transform((v) => `+593${v}`);
 

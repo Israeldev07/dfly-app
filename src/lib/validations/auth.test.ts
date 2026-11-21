@@ -22,6 +22,21 @@ describe("ecuadorMobileSchema", () => {
   it.each(["062123456", "12345", "+51987654321", "09912345678"])("rechaza %s", (input) => {
     expect(ecuadorMobileSchema.safeParse(input).success).toBe(false);
   });
+
+  it.each(["+51 987 654 321", "+57 300 123 4567", "+1 (912) 345-6789", "+34 912 345 678"])(
+    "rechaza el celular extranjero %s diciendo que solo se aceptan de Ecuador",
+    (input) => {
+      const result = ecuadorMobileSchema.safeParse(input);
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues[0]?.message).toBe("Solo se aceptan celulares de Ecuador (+593)");
+    },
+  );
+
+  it("rechaza un fijo de Ecuador con el mensaje de celular inválido", () => {
+    const result = ecuadorMobileSchema.safeParse("+593 6 292 0000");
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe("Ingresa un celular válido (ej. 099 123 4567)");
+  });
 });
 
 describe("contraseña nueva", () => {

@@ -1,4 +1,4 @@
-import type { OrderStatus } from "@/generated/prisma/enums";
+import type { OrderStatus, OutboxKind, OutboxStatus } from "@/generated/prisma/enums";
 import { generateCode } from "@/lib/codes";
 
 /** Estados en los que el cliente todavía espera respuesta del comercio. */
@@ -79,4 +79,17 @@ export function generatePublicCode() {
 export function deliveryFeeCents() {
   const raw = Number(process.env.DELIVERY_FEE_CENTS ?? "200");
   return Number.isInteger(raw) && raw >= 0 ? raw : 200;
+}
+
+type StoreMessage = { kind: OutboxKind; status: OutboxStatus; partsSent: number };
+
+/**
+ * Si al cancelar hay que avisar al comercio: solo si recibió el pedido (salió entero o al menos su primer
+ * mensaje, en pedidos largos) y aún no se le dijo que no lo prepare (al vencer ya recibió ese aviso).
+ * La usan la cancelación y el texto de confirmación del panel, para que digan lo mismo.
+ */
+export function storeNeedsCancelNotice(messages: readonly StoreMessage[]) {
+  const contacted = messages.some((m) => m.kind === "STORE_REQUEST" && (m.status === "SENT" || m.partsSent > 0));
+  const alreadyTold = messages.some((m) => m.kind === "STORE_CANCELLED" || m.kind === "STORE_LATE_RESPONSE");
+  return contacted && !alreadyTold;
 }

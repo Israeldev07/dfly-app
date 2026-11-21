@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { CheckboxField, Field, FormError, SelectField, SubmitButton, TextareaField } from "@/components/forms";
 import { CATEGORIES } from "@/modules/catalog/categories";
@@ -30,6 +30,23 @@ const EMPTY: StoreFormValues = {
   imageUrl: null,
 };
 
+const STUCK_AFTER_MS = 10_000;
+
+/**
+ * Comercio creado pero la navegación a su ficha no terminó (este formulario sigue montado): tras unos
+ * segundos se avisa. No se ofrece recargar: recargar "Nuevo comercio" mostraría el formulario vacío y
+ * se podría crear el mismo comercio dos veces.
+ */
+function useNavigationStuck(redirectTo: string | undefined) {
+  const [stuckFor, setStuckFor] = useState<string>();
+  useEffect(() => {
+    if (!redirectTo) return;
+    const timer = setTimeout(() => setStuckFor(redirectTo), STUCK_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [redirectTo]);
+  return Boolean(redirectTo) && stuckFor === redirectTo;
+}
+
 export function StoreForm({ storeId, initial = EMPTY }: { storeId?: string; initial?: StoreFormValues }) {
   const [state, action] = useActionState<AdminFormState, FormData>(saveStoreAction, {});
   const fe = state.fieldErrors ?? {};
@@ -37,6 +54,7 @@ export function StoreForm({ storeId, initial = EMPTY }: { storeId?: string; init
   // Tras un error, el checkbox sigue lo que se envió (ausente = desmarcado).
   const isActive = state.values ? state.values.isActive === "on" : initial.isActive;
   useRedirectAfterSave(state.redirectTo);
+  const stuck = useNavigationStuck(state.redirectTo);
 
   return (
     <form action={action} noValidate className="flex flex-col gap-4">
@@ -98,6 +116,12 @@ export function StoreForm({ storeId, initial = EMPTY }: { storeId?: string; init
         <p role="status" className="flex items-center gap-2 text-[14px] font-medium text-route-deep">
           <CheckCircle2 aria-hidden className="size-4" strokeWidth={2.25} />
           {state.redirectTo ? "Comercio creado. Abriendo su ficha…" : "Cambios guardados."}
+        </p>
+      ) : null}
+      {stuck ? (
+        <p role="alert" className="text-[14px] font-medium text-brand-deep">
+          La página no termina de abrir. El comercio ya quedó guardado: no lo vuelvas a crear. Contacta con el servicio
+          técnico para que lo revise.
         </p>
       ) : null}
       <div className="sm:w-60">

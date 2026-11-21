@@ -75,6 +75,11 @@ export function CancelOrder({
           No, volver
         </button>
       </div>
+      {state.error ? (
+        <p role="alert" className="text-[13.5px] font-medium text-brand-deep">
+          {state.error}
+        </p>
+      ) : null}
     </form>
   );
 }

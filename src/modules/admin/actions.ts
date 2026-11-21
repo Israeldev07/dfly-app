@@ -60,7 +60,11 @@ export async function cancelOrderAction(_prev: AdminFormState, formData: FormDat
   if (!orderId.success) return { error: "Pedido inválido." };
 
   const result = await cancelOrderByAdmin(orderId.data);
-  if (result !== "cancelled") return { error: CANCEL_ERRORS[result] };
+  if (result !== "cancelled") {
+    // El pedido cambió (p. ej. el comercio respondió): se refresca para que el panel muestre su estado real.
+    refresh();
+    return { error: CANCEL_ERRORS[result] };
+  }
 
   after(() => dispatchOrderMessages({ orderId: orderId.data }));
   refresh();

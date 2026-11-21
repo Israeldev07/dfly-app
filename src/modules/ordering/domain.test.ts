@@ -3,6 +3,7 @@ import { ecuadorMobileSchema } from "@/lib/validations/auth";
 import { extractButtonTaps } from "@/modules/messaging/webhook";
 import {
   canTransition,
+  storeNeedsCancelNotice,
   computeTotals,
   customerCanCancelNow,
   customerCanRequestCancel,
@@ -167,5 +168,28 @@ describe("remitente con un webhook real de Meta", () => {
   it("no reconoce a otro número que pulse un botón reenviado", () => {
     const [tap] = extractButtonTaps(metaWebhook("593998887777"), "106540352242922");
     expect(isStoreSender(tap!.from, [stored])).toBe(false);
+  });
+});
+
+describe("storeNeedsCancelNotice", () => {
+  const req = (status: "PENDING" | "SENT" | "FAILED" | "SKIPPED", partsSent = 0) => ({ kind: "STORE_REQUEST" as const, status, partsSent });
+
+  it("avisa si el comercio recibió el pedido entero o su primer mensaje", () => {
+    expect(storeNeedsCancelNotice([req("SENT")])).toBe(true);
+    expect(storeNeedsCancelNotice([req("FAILED", 1)])).toBe(true);
+    expect(storeNeedsCancelNotice([req("SKIPPED", 2)])).toBe(true);
+  });
+
+  it("no avisa si el pedido nunca le llegó", () => {
+    expect(storeNeedsCancelNotice([req("PENDING")])).toBe(false);
+    expect(storeNeedsCancelNotice([req("FAILED")])).toBe(false);
+    expect(storeNeedsCancelNotice([])).toBe(false);
+  });
+
+  it("no repite el aviso si ya se le dijo que no lo prepare", () => {
+    const late = { kind: "STORE_LATE_RESPONSE" as const, status: "SENT" as const, partsSent: 0 };
+    const cancelled = { kind: "STORE_CANCELLED" as const, status: "PENDING" as const, partsSent: 0 };
+    expect(storeNeedsCancelNotice([req("SENT"), late])).toBe(false);
+    expect(storeNeedsCancelNotice([req("SENT"), cancelled])).toBe(false);
   });
 });

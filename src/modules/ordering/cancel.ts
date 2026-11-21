@@ -8,7 +8,7 @@ import {
   storeCancelledMessage,
 } from "@/modules/messaging/messages";
 import { adminPhone, enqueue } from "@/modules/messaging/outbox";
-import { canTransition, customerCanCancelNow, customerCanRequestCancel } from "./domain";
+import { canTransition, customerCanCancelNow, customerCanRequestCancel, storeNeedsCancelNotice } from "./domain";
 import { storeNoticeRecipient } from "./store-contact";
 import { transitionOrder } from "./transitions";
 
@@ -43,15 +43,11 @@ async function applyCancellation(
     where: { orderId: order.id, kind: "STORE_REQUEST", status: { in: ["PENDING", "FAILED"] } },
     data: { status: "SKIPPED", lastError: "Pedido cancelado antes de enviarse por completo" },
   });
-  const [storeWasContacted, storeAlreadyTold] = await Promise.all([
-    // Recibió el pedido si salió entero o al menos su primer mensaje (pedidos largos van en varios).
-    tx.outboxMessage.count({
-      where: { orderId: order.id, kind: "STORE_REQUEST", OR: [{ status: "SENT" }, { partsSent: { gt: 0 } }] },
-    }),
-    // Al vencer, el comercio ya recibió "no lo prepares".
-    tx.outboxMessage.count({ where: { orderId: order.id, kind: { in: ["STORE_CANCELLED", "STORE_LATE_RESPONSE"] } } }),
-  ]);
-  if (storeWasContacted > 0 && storeAlreadyTold === 0) {
+  const storeMessages = await tx.outboxMessage.findMany({
+    where: { orderId: order.id, kind: { in: ["STORE_REQUEST", "STORE_CANCELLED", "STORE_LATE_RESPONSE"] } },
+    select: { kind: true, status: true, partsSent: true },
+  });
+  if (storeNeedsCancelNotice(storeMessages)) {
     await enqueue(
       tx,
       order.id,

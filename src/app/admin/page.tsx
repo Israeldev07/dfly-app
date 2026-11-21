@@ -62,8 +62,8 @@ export default async function AdminHomePage() {
           <h2 id="atencion" className="text-[20px] font-bold tracking-[-0.01em]">
             Requieren atención
           </h2>
-          <Link href="/admin/pedidos" className="text-[14.5px] font-semibold text-brand hover:text-brand-deep">
-            Ver todos los pedidos
+          <Link href="/admin/pedidos?estado=atencion" className="text-[14.5px] font-semibold text-brand hover:text-brand-deep">
+            {s.attentionTotal > s.attention.length ? `Ver los ${s.attentionTotal}` : "Ver en pedidos"}
           </Link>
         </div>
         {s.attention.length === 0 ? (
@@ -77,6 +77,11 @@ export default async function AdminHomePage() {
               Pedidos sin respuesta del comercio, con mensajes de WhatsApp que no salieron o con una solicitud de cancelación del cliente. Resuélvelos desde el detalle.
             </p>
             <OrderRows orders={s.attention} />
+            {s.attentionTotal > s.attention.length ? (
+              <p className="tabular text-[14px] text-ink-soft">
+                Se muestran los {s.attention.length} más recientes de {s.attentionTotal}.
+              </p>
+            ) : null}
           </>
         )}
       </section>

@@ -15,7 +15,7 @@ export async function getTodaySummary(now = new Date()) {
   const { start, end } = ecuadorDayRange(now);
   const today = { createdAt: { gte: start, lt: end } };
 
-  const [byStatus, accepted, attention] = await Promise.all([
+  const [byStatus, accepted, attention, attentionTotal] = await Promise.all([
     prisma.order.groupBy({ by: ["status"], where: today, _count: { _all: true } }),
     prisma.order.aggregate({ where: { ...today, status: "ACCEPTED" }, _sum: { totalCents: true } }),
     prisma.order.findMany({
@@ -24,6 +24,7 @@ export async function getTodaySummary(now = new Date()) {
       take: 10,
       select: attentionSelect,
     }),
+    prisma.order.count({ where: NEEDS_ATTENTION }),
   ]);
 
   const counts = Object.fromEntries(byStatus.map((r) => [r.status, r._count._all])) as Partial<Record<OrderStatus, number>>;
@@ -37,6 +38,7 @@ export async function getTodaySummary(now = new Date()) {
     cancelled: counts.CANCELLED ?? 0,
     acceptedSalesCents: accepted._sum.totalCents ?? 0,
     attention,
+    attentionTotal,
   };
 }
 

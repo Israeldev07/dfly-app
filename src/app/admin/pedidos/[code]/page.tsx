@@ -9,6 +9,10 @@ import { ACTOR, ADMIN_STATUS, MESSAGE_KIND, MESSAGE_STATUS, PAYMENT, dateTime, t
 import { canAdminCancel, canRetryMessage } from "@/modules/admin/domain";
 import { getAdminOrder } from "@/modules/admin/queries";
 import { requireAdmin } from "@/modules/identity/session";
+import { storeNeedsCancelNotice } from "@/modules/ordering/domain";
+
+// Día en Ecuador, para mostrar la fecha de un mensaje solo si no es del mismo día que el pedido.
+const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil" });
 
 export async function generateMetadata({ params }: PageProps<"/admin/pedidos/[code]">): Promise<Metadata> {
   const { code } = await params;
@@ -36,7 +40,8 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/pedid
   if (!order) notFound();
 
   const status = ADMIN_STATUS[order.status];
-  const storeWasContacted = order.messages.some((m) => m.kind === "STORE_REQUEST" && m.status === "SENT");
+  const storeWillBeNotified = storeNeedsCancelNotice(order.messages);
+  const sameDay = (d: Date) => dayKey.format(d) === dayKey.format(order.createdAt);
   const phoneDigits = order.customerPhone.replace(/\D/g, "");
   const request = order.cancellationRequest;
   const requestPending = request?.status === "PENDING";
@@ -118,7 +123,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/pedid
                       </div>
                       {preview ? <p className="text-[14px] leading-snug text-ink-soft">{preview}</p> : null}
                       <p className="tabular text-[13px] text-ink-soft">
-                        {timeOnly.format(m.updatedAt)}
+                        {(sameDay(m.updatedAt) ? timeOnly : dateTime).format(m.updatedAt)}
                         {m.attempts > 0 ? ` · ${m.attempts === 1 ? "1 intento" : `${m.attempts} intentos`}` : ""}
                       </p>
                       {m.lastError && m.status !== "SENT" ? (
@@ -205,7 +210,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/pedid
             <div className="flex flex-col gap-2 border-t border-line pt-5">
               <CancelOrder
                 orderId={order.id}
-                storeWillBeNotified={storeWasContacted}
+                storeWillBeNotified={storeWillBeNotified}
                 label={requestPending ? "Aprobar y cancelar pedido" : "Cancelar pedido"}
               />
               {requestPending ? <RejectCancelRequest orderId={order.id} /> : null}

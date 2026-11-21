@@ -12,6 +12,8 @@ import { requireAdmin } from "@/modules/identity/session";
 
 export async function generateMetadata({ params }: PageProps<"/admin/comercios/[id]">): Promise<Metadata> {
   const { id } = await params;
+  // No depende del orden en que Next resuelve la metadata: a quien no es admin no se le consulta el comercio.
+  await requireAdmin(`/admin/comercios/${id}`);
   const store = await getAdminStore(id);
   return { title: store?.name ?? "Comercio" };
 }

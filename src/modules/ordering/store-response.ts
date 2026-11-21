@@ -103,6 +103,15 @@ export async function applyStoreResponse(
         return "late-noticed";
       }
 
+      if (!accepted) {
+        // Pedido largo: si el comercio rechaza antes de recibir todas las partes, ya no se le manda el resto.
+        // Con ACCEPTED sí se sigue enviando: necesita el detalle para prepararlo.
+        await tx.outboxMessage.updateMany({
+          where: { orderId, kind: "STORE_REQUEST", status: { in: ["PENDING", "FAILED"] } },
+          data: { status: "SKIPPED", lastError: "Pedido rechazado antes de enviarse por completo" },
+        });
+      }
+
       const firstName = order.customerName.split(/\s+/)[0] ?? order.customerName;
       await enqueue(tx, orderId, "ADMIN_RESULT", ownerPhone, adminResultMessage(order.publicCode, order.store.name, accepted));
       await enqueue(

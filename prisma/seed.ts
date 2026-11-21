@@ -2,6 +2,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, StoreCategory } from "../src/generated/prisma/client";
+import { passwordResetUpdate } from "../src/modules/identity/account-rules";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DIRECT_URL }),
@@ -177,9 +178,14 @@ async function seedAdmin() {
     );
   }
 
-  await prisma.user.update({
-    where: { id: existing.id },
-    data: { role: "ADMIN", password: await bcrypt.hash(password, 12), emailVerified: new Date() },
+  // Como al recuperar la contraseña: se anulan las sesiones abiertas (pudo abrirlas otra persona) y, si el
+  // correo no estaba verificado, se borra lo que fijó quien creó la cuenta (nombre, celular, códigos).
+  const hash = await bcrypt.hash(password, 12);
+  await prisma.$transaction(async (tx) => {
+    const { emailVerified } = await tx.user.findUniqueOrThrow({ where: { id: existing.id }, select: { emailVerified: true } });
+    const { unproven, ...data } = passwordResetUpdate(emailVerified, new Date());
+    await tx.user.update({ where: { id: existing.id }, data: { ...data, role: "ADMIN", password: hash }, select: { id: true } });
+    if (unproven) await tx.verificationCode.deleteMany({ where: { userId: existing.id } });
   });
   console.log(`Cuenta existente ascendida a ADMIN con contraseña nueva: ${email}`);
 }

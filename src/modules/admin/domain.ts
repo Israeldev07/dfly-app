@@ -11,7 +11,14 @@ import { canTransition } from "@/modules/ordering/domain";
 export const NEEDS_ATTENTION: Prisma.OrderWhereInput = {
   OR: [
     { status: "EXPIRED" },
-    { messages: { some: { status: "FAILED" } }, status: { not: "CANCELLED" } },
+    // Cualquier aviso fallido, aunque el pedido esté cancelado (p. ej. el STORE_CANCELLED: si no llega,
+    // el comercio podría preparar el pedido). Siempre se pueden reintentar.
+    { messages: { some: { status: "FAILED", kind: { not: "STORE_REQUEST" } } } },
+    // El pedido al comercio, solo mientras se pueda reintentar (ver `canRetryMessage`).
+    {
+      messages: { some: { status: "FAILED", kind: "STORE_REQUEST" } },
+      status: { in: ["PENDING", "SENT_TO_STORE", "ACCEPTED"] },
+    },
     { cancellationRequest: { is: { status: "PENDING" } } },
   ],
 };

@@ -68,7 +68,9 @@ export const useCart = create<CartState>()(
     {
       name: "dfly-cart",
       version: 2,
-      storage: createJSONStorage(() => localStorage),
+      // `window.` a propósito: en el servidor lanza y zustand lo ignora; el
+      // `localStorage` global de Node (experimental) imprime un aviso al tocarlo.
+      storage: createJSONStorage(() => window.localStorage),
       partialize: (s) => ({ store: s.store, lines: s.lines }),
       // v1 no tenía opciones: cada línea era un producto sin acompañantes.
       migrate: (persisted, version) => {

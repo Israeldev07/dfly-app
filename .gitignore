@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!.env.docker.example
 
 # vercel
 .vercel
@@ -41,8 +42,20 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# fotos subidas en desarrollo sin Supabase (src/lib/storage.ts)
+/public/uploads
+
 # prisma client generado
 /src/generated
 
 # configuración local de Claude Code (por máquina)
 /.claude/settings.local.json
+
+# Solo locales: herramientas de Claude, diseño de referencia y archivos sin uso en la app
+/.claude/
+/.impeccable/
+/skills-lock.json
+/Dfly Home v2.dc.html
+/README.md
+/public/images/hero-rider.jpg
+/public/videos/Sequence 03.mp4

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { GoogleButton } from "@/components/google-button";
 import { safeCallbackUrl } from "@/lib/safe-callback";
 import { RegisterForm } from "./register-form";
 
@@ -14,10 +13,9 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registr
     <div className="flex flex-col gap-7">
       <div className="flex flex-col gap-2.5">
         <h1 className="font-display text-[34px] leading-none tracking-[-0.03em]">Crea tu cuenta</h1>
-        <p className="text-[15px] text-ink-soft">Tarda menos de un minuto. Luego eliges tu comercio y pides.</p>
+        <p className="text-[15px] text-ink-soft">Tarda un minuto. Después confirmas tu correo y tu celular con un código, una sola vez.</p>
       </div>
       <div className="flex flex-col gap-5 rounded-surface bg-surface p-5 shadow-lift ring-1 ring-line sm:p-7">
-        <GoogleButton />
         <RegisterForm callbackUrl={next} />
       </div>
       <p className="text-center text-[14.5px] text-ink-soft">

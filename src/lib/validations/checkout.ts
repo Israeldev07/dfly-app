@@ -1,0 +1,64 @@
+import { z } from "zod";
+import { lineKey } from "@/modules/catalog/options";
+
+/** Igual que `MAX_QTY` del carrito: por línea (producto + opciones elegidas). */
+const MAX_QTY = 50;
+const MAX_QTY_MESSAGE = `Máximo ${MAX_QTY} unidades por producto`;
+
+const cartItemsSchema = z
+  .array(
+    z.object({
+      productId: z.string().min(1).max(40),
+      quantity: z.number().int().min(1, "Cantidad inválida").max(MAX_QTY, MAX_QTY_MESSAGE),
+      optionIds: z.array(z.string().min(1).max(40)).max(30).default([]),
+    }),
+  )
+  .min(1, "Tu carrito está vacío")
+  .max(40, "Demasiados productos en un solo pedido")
+  // El carrito junta en una línea el mismo producto con las mismas opciones; repetir la línea
+  // (solo manipulando el envío) no debe servir para saltarse el tope.
+  .superRefine((items, ctx) => {
+    const totals = new Map<string, number>();
+    for (const item of items) {
+      const key = lineKey(item.productId, item.optionIds);
+      const total = (totals.get(key) ?? 0) + item.quantity;
+      totals.set(key, total);
+      if (total > MAX_QTY) {
+        ctx.addIssue({ code: "custom", message: MAX_QTY_MESSAGE });
+        return;
+      }
+    }
+  });
+
+export const checkoutSchema = z.object({
+  storeId: z.string().min(1).max(40),
+  items: z
+    .string()
+    .transform((raw, ctx) => {
+      try {
+        return JSON.parse(raw) as unknown;
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Carrito inválido" });
+        return z.NEVER;
+      }
+    })
+    .pipe(cartItemsSchema),
+  addressLine: z.string().trim().min(5, "Escribe calle y número").max(160),
+  sector: z.string().trim().min(2, "Indica tu barrio o sector").max(60),
+  reference: z.string().trim().max(160).optional().transform((v) => v || null),
+  notes: z.string().trim().max(300, "Máximo 300 caracteres").optional().transform((v) => v || null),
+  paymentMethod: z.enum(["CASH", "TRANSFER"], { error: "Elige cómo vas a pagar" }),
+  /** Total que vio el cliente. Si no coincide con el de la base de datos, no se crea el pedido. */
+  expectedTotalCents: z.coerce
+    .number({ error: "Recarga la página para ver tu total actualizado." })
+    .int("Recarga la página para ver tu total actualizado.")
+    .min(0, "Recarga la página para ver tu total actualizado."),
+});
+
+export type CheckoutInput = z.infer<typeof checkoutSchema>;
+
+/** Cotización del carrito: precios actuales de los productos de un comercio. */
+export const cartQuoteSchema = z.object({
+  storeId: z.string().min(1).max(40),
+  productIds: z.array(z.string().min(1).max(40)).min(1).max(40),
+});

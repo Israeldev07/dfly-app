@@ -14,6 +14,9 @@
   /* Rojo aclarado para enlaces sobre fondo oscuro (contraste AA sobre la foto). */
   --color-brand-light: #ff4d77;
   --color-surface: #ffffff;
+  /* Fondo del video del hero (debe coincidir con el azul del MP4) y su velo de legibilidad. */
+  --color-hero: #24739b;
+  --color-hero-deep: #0a3247;
   --color-muted: #eceae6;
 
   --font-sans: var(--font-archivo), system-ui, sans-serif;
@@ -25,7 +28,7 @@
   --shadow-lift: 0 14px 30px -22px rgb(38 38 38 / 0.5);
   --shadow-pop: 0 18px 40px -18px rgb(38 38 38 / 0.45);
 
-  /* Curvas de la skill animacion (Emil Kowalski). */
+  /* Curvas de la skill animate (Emil Kowalski). */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
@@ -104,6 +107,47 @@
     }
   }
 
+  /* Barra del carrito: entra y sale por abajo (misma ruta), interrumpible. */
+  .cart-bar {
+    transition:
+      transform 240ms var(--ease-out),
+      opacity 240ms var(--ease-out),
+      visibility 0s linear 240ms;
+  }
+  .cart-bar[data-open="false"] {
+    transform: translateY(110%);
+    opacity: 0;
+    visibility: hidden;
+  }
+  .cart-bar[data-open="true"] {
+    transition-delay: 0s;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cart-bar,
+    .cart-bar[data-open="false"] {
+      transform: none;
+      transition:
+        opacity 150ms ease,
+        visibility 0s linear 150ms;
+    }
+    .cart-bar[data-open="true"] {
+      transition-delay: 0s;
+    }
+  }
+
+  /* Entrada del hero: cada bloque sube y aparece, escalonado con --i (70 ms por paso).
+     Animación CSS para que no se trabe mientras la página termina de cargar. */
+  .hero-in {
+    animation: hero-in 600ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 70ms + 80ms);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-in {
+      animation-name: hero-fade;
+      animation-duration: 200ms;
+    }
+  }
+
   /* Feedback de pulsación en botones primarios. */
   .press {
     transition:
@@ -112,5 +156,18 @@
   }
   .press:active:not(:disabled) {
     transform: scale(0.97);
+  }
+}
+
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes hero-fade {
+  from {
+    opacity: 0;
   }
 }

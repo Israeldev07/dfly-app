@@ -1,0 +1,22 @@
+# Dependencias y salidas: se generan dentro de la imagen.
+node_modules
+.next
+src/generated
+tsconfig.tsbuildinfo
+coverage
+
+# Secretos: las variables se pasan al contenedor, nunca dentro de la imagen.
+.env*
+!.env.example
+
+# Fotos subidas en desarrollo y archivos que no hacen falta para compilar.
+public/uploads
+.git
+.claude
+.impeccable
+.vercel
+PENDIENTES-COMERCIOS.md
+*.dc.html
+*.md
+Dockerfile
+docker-compose.yml

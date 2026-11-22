@@ -1,0 +1,133 @@
+"use client";
+
+import { useActionState, useEffect, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
+import { CheckboxField, Field, FormError, SelectField, SubmitButton, TextareaField } from "@/components/forms";
+import { CATEGORIES } from "@/modules/catalog/categories";
+import { saveStoreAction, type AdminFormState } from "@/modules/admin/actions";
+import { ImageField } from "./image-field";
+import { useRedirectAfterSave } from "./use-redirect-after-save";
+
+export type StoreFormValues = {
+  name: string;
+  description: string;
+  category: string;
+  sector: string;
+  etaMinutes: string;
+  whatsappPhone: string;
+  isActive: boolean;
+  imageUrl: string | null;
+};
+
+const EMPTY: StoreFormValues = {
+  name: "",
+  description: "",
+  category: "",
+  sector: "",
+  etaMinutes: "30",
+  whatsappPhone: "",
+  isActive: true,
+  imageUrl: null,
+};
+
+const STUCK_AFTER_MS = 10_000;
+
+/**
+ * Comercio creado pero la navegación a su ficha no terminó (este formulario sigue montado): tras unos
+ * segundos se avisa. No se ofrece recargar: recargar "Nuevo comercio" mostraría el formulario vacío y
+ * se podría crear el mismo comercio dos veces.
+ */
+function useNavigationStuck(redirectTo: string | undefined) {
+  const [stuckFor, setStuckFor] = useState<string>();
+  useEffect(() => {
+    if (!redirectTo) return;
+    const timer = setTimeout(() => setStuckFor(redirectTo), STUCK_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [redirectTo]);
+  return Boolean(redirectTo) && stuckFor === redirectTo;
+}
+
+export function StoreForm({ storeId, initial = EMPTY }: { storeId?: string; initial?: StoreFormValues }) {
+  const [state, action] = useActionState<AdminFormState, FormData>(saveStoreAction, {});
+  const fe = state.fieldErrors ?? {};
+  const v = { ...initial, ...state.values };
+  // Tras un error, el checkbox sigue lo que se envió (ausente = desmarcado).
+  const isActive = state.values ? state.values.isActive === "on" : initial.isActive;
+  useRedirectAfterSave(state.redirectTo);
+  const stuck = useNavigationStuck(state.redirectTo);
+
+  return (
+    <form action={action} noValidate className="flex flex-col gap-4">
+      {storeId ? <input type="hidden" name="storeId" value={storeId} /> : null}
+      <FormError message={state.error} />
+      <Field label="Nombre" name="name" defaultValue={v.name} required error={fe.name} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SelectField
+          label="Categoría"
+          name="category"
+          defaultValue={v.category}
+          error={fe.category}
+          options={[{ value: "", label: "Elige una categoría" }, ...CATEGORIES.map((c) => ({ value: c.value, label: c.label }))]}
+        />
+        <Field label="Barrio o sector" name="sector" defaultValue={v.sector} placeholder="Ej. Centro" required error={fe.sector} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="WhatsApp del comercio"
+          name="whatsappPhone"
+          type="tel"
+          inputMode="tel"
+          placeholder="099 123 4567"
+          defaultValue={v.whatsappPhone}
+          required
+          error={fe.whatsappPhone}
+          hint="Aquí le llegan los pedidos con Aceptar/Rechazar. Nunca se muestra al cliente."
+        />
+        <Field
+          label="Tiempo de entrega (min)"
+          name="etaMinutes"
+          type="number"
+          inputMode="numeric"
+          min={5}
+          max={180}
+          defaultValue={v.etaMinutes}
+          required
+          error={fe.etaMinutes}
+        />
+      </div>
+      <TextareaField
+        label="Descripción (opcional)"
+        name="description"
+        maxLength={200}
+        defaultValue={v.description}
+        placeholder="Ej. Fritada y hornado tradicional"
+        error={fe.description}
+      />
+      {/* La key lo reinicia al guardar: si no, el archivo ya subido quedaría elegido y se volvería a enviar. */}
+      <ImageField key={initial.imageUrl ?? "sin-foto"} label="Foto del local (opcional)" currentUrl={initial.imageUrl} error={fe.image} />
+      <CheckboxField
+        label="Visible para los clientes"
+        name="isActive"
+        defaultChecked={isActive}
+        hint="Desmárcalo para ocultarlo del catálogo sin borrar sus productos ni pedidos."
+        key={String(isActive)}
+      />
+      {state.ok ? (
+        <p role="status" className="flex items-center gap-2 text-[14px] font-medium text-route-deep">
+          <CheckCircle2 aria-hidden className="size-4" strokeWidth={2.25} />
+          {state.redirectTo ? "Comercio creado. Abriendo su ficha…" : "Cambios guardados."}
+        </p>
+      ) : null}
+      {stuck ? (
+        <p role="alert" className="text-[14px] font-medium text-brand-deep">
+          La página no termina de abrir. El comercio ya quedó guardado: no lo vuelvas a crear. Contacta con el servicio
+          técnico para que lo revise.
+        </p>
+      ) : null}
+      <div className="sm:w-60">
+        {/* Ya creado: bloqueado mientras se navega para no crear el comercio dos veces. */}
+        <SubmitButton pendingLabel="Guardando…" disabled={Boolean(state.redirectTo)}>{storeId ? "Guardar cambios" : "Crear comercio"}</SubmitButton>
+      </div>
+    </form>
+  );
+}

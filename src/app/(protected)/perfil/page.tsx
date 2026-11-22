@@ -1,0 +1,55 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { EmailVerification } from "@/components/email-verification";
+import { PhoneVerification } from "@/components/phone-verification";
+import { getProfile } from "@/modules/identity/queries";
+import { requireUser } from "@/modules/identity/session";
+import { ProfileForm } from "./profile-form";
+
+export const metadata: Metadata = { title: "Mi perfil" };
+
+export default async function ProfilePage() {
+  const user = await requireUser("/perfil");
+  const profile = await getProfile(user.id);
+  const { address } = profile;
+
+  return (
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 pt-8 pb-20 sm:px-8 sm:pt-12">
+      <div className="flex flex-col gap-2">
+        <h1 className="font-display text-[32px] leading-none tracking-[-0.03em] sm:text-[40px]">Mi perfil</h1>
+        <p className="text-[15px] text-ink-soft">{profile.email}</p>
+      </div>
+
+      <section className="flex flex-col gap-5 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
+        <h2 className="text-[17px] font-bold">Tus datos</h2>
+        <ProfileForm name={profile.name ?? ""} />
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
+        <h2 className="text-[17px] font-bold">Tu correo</h2>
+        <EmailVerification email={profile.email} verified={profile.emailVerified} />
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
+        <h2 className="text-[17px] font-bold">Tu celular</h2>
+        <PhoneVerification phone={profile.phone ?? ""} verified={profile.phoneVerified} pendingPhone={profile.pendingPhone} />
+      </section>
+
+      <section className="flex flex-col gap-2 rounded-surface bg-surface p-5 ring-1 ring-line sm:p-7">
+        <h2 className="text-[17px] font-bold">Dirección de entrega</h2>
+        {address ? (
+          <p className="text-[15px] text-ink/80">
+            {address.line}, {address.sector}, {address.city}
+            {address.reference ? ` (${address.reference})` : ""}
+          </p>
+        ) : (
+          <p className="text-[15px] text-ink-soft">La guardamos automáticamente con tu primer pedido.</p>
+        )}
+      </section>
+
+      <Link href="/pedidos" className="w-fit font-semibold text-brand underline hover:text-brand-deep">
+        Ver mis pedidos
+      </Link>
+    </main>
+  );
+}

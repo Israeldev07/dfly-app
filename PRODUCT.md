@@ -30,7 +30,7 @@ Dfly deja al cliente pedir a los comercios de su zona desde una sola web. Cada p
 
 ## Capabilities and Constraints
 
-- Stack: Next.js 16 (App Router) + PostgreSQL/Prisma 7 + Auth.js v5 (credenciales + Google).
+- Stack: Next.js 16 (App Router) + PostgreSQL/Prisma 7 + Auth.js v5 (email + contraseña; correo y celular verificados con un código, una sola vez).
 - Moneda **USD**; celulares de Ecuador (+593).
 - Dirección como texto (sector y referencia); sin mapa ni geolocalización en el MVP.
 - Header: solo el logo, "Mi perfil" y los accesos Iniciar sesión / Registrarse. **Sin selector de dirección "Enviar a"** en el header (decisión del usuario).

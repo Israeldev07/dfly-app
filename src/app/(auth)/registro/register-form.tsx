@@ -1,12 +1,27 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Field, FormError, SubmitButton } from "@/components/forms";
-import { registerAction, type FormState } from "@/modules/identity/actions";
+import { registerAction, type RegisterState } from "@/modules/identity/auth-actions";
+import { RegisterCodeStep } from "./register-code-step";
 
 export function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
-  const [state, action] = useActionState<FormState, FormData>(registerAction, {});
+  const [state, action] = useActionState<RegisterState, FormData>(registerAction, {});
+  // "Usar otro correo" vuelve al formulario con los datos que ya escribió.
+  const [editing, setEditing] = useState(false);
+  const [lastPending, setLastPending] = useState(state.pending);
+  if (state.pending !== lastPending) {
+    setLastPending(state.pending);
+    setEditing(false);
+  }
+
+  if (state.pending && !editing) {
+    return <RegisterCodeStep pending={state.pending} callbackUrl={callbackUrl} onChangeEmail={() => setEditing(true)} />;
+  }
+
   const optInError = state.fieldErrors?.whatsappOptIn;
+  // Tras un error, la casilla sigue lo que se envió (React reinicia el formulario al terminar la action).
+  const optedIn = state.values?.whatsappOptIn === "on";
 
   return (
     <form action={action} noValidate className="flex flex-col gap-4">
@@ -40,7 +55,7 @@ export function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
         required
         defaultValue={state.values?.phone}
         error={state.fieldErrors?.phone}
-        hint="Aquí te confirmamos cada pedido. El comercio nunca ve tu número."
+        hint="Te enviaremos un código por WhatsApp para confirmarlo. El comercio nunca ve tu número."
       />
       <Field
         label="Contraseña"
@@ -58,6 +73,8 @@ export function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
           <input
             type="checkbox"
             name="whatsappOptIn"
+            defaultChecked={optedIn}
+            key={String(optedIn)}
             required
             aria-invalid={optInError ? true : undefined}
             aria-describedby={optInError ? "optin-error" : undefined}

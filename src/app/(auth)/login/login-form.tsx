@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { Field, FormError, SubmitButton } from "@/components/forms";
-import { loginAction, type FormState } from "@/modules/identity/actions";
+import { loginAction, type FormState } from "@/modules/identity/auth-actions";
 
 export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, action] = useActionState<FormState, FormData>(loginAction, {});
@@ -28,6 +29,12 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
         required
         error={state.fieldErrors?.password}
       />
+      <Link
+        href="/recuperar"
+        className="-mt-1 inline-flex min-h-11 w-fit items-center text-[14px] font-semibold text-brand underline underline-offset-2 hover:text-brand-deep"
+      >
+        ¿Olvidaste tu contraseña?
+      </Link>
       <SubmitButton pendingLabel="Entrando…">Iniciar sesión</SubmitButton>
     </form>
   );

@@ -1,0 +1,92 @@
+# Dfly con Docker: base de datos, migraciones, app y crons. Variables en `.env.docker`
+# (copia de `.env.docker.example`); nunca se copian dentro de la imagen.
+#   docker compose up -d --build          levanta todo en http://localhost:3000
+#   docker compose --profile local up -d --build   igual, más Mailpit (correos en http://localhost:8025)
+#   docker compose run --rm seed          crea el admin (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD)
+#   docker compose run --rm import        importa el catálogo real (idempotente)
+#   docker compose logs -f app            ver la consola del servidor
+#   docker compose down                   apagar (los datos quedan en el volumen db-data)
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      POSTGRES_USER: dfly
+      POSTGRES_DB: dfly
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dfly -d dfly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Aplica las migraciones pendientes y termina; la app arranca después.
+  migrate:
+    build: { context: ., target: tools }
+    image: dfly-tools
+    env_file: .env.docker
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  app:
+    build: { context: ., target: runner }
+    image: dfly-app
+    restart: unless-stopped
+    env_file: .env.docker
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  # Reemplaza los crons de vercel.json: cada minuto llama a los dos endpoints con el Bearer.
+  cron:
+    image: curlimages/curl:8.11.1
+    restart: unless-stopped
+    env_file: .env.docker
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          sleep 60
+          for path in outbox expire-orders; do
+            curl -fsS -m 50 -H "Authorization: Bearer $$CRON_SECRET" "http://app:3000/api/cron/$$path" > /dev/null \
+              || echo "[cron] fallo en /api/cron/$$path"
+          done
+        done
+    depends_on:
+      - app
+
+  # Solo para pruebas locales (`--profile local`): atrapa los correos y los muestra en
+  # http://localhost:8025. Con SMTP_HOST="mailpit" en .env.docker; en un servidor real, un SMTP de verdad.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+    profiles: ["local"]
+
+  # Tareas a mano (no arrancan con `up`).
+  seed:
+    build: { context: ., target: tools }
+    image: dfly-tools
+    env_file: .env.docker
+    command: ["npx", "prisma", "db", "seed"]
+    profiles: ["tools"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  import:
+    build: { context: ., target: tools }
+    image: dfly-tools
+    env_file: .env.docker
+    command: ["npx", "tsx", "prisma/import-catalog.ts"]
+    profiles: ["tools"]
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  db-data:

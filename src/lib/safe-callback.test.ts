@@ -3,12 +3,12 @@ import { safeCallbackUrl } from "./safe-callback";
 
 describe("safeCallbackUrl", () => {
   it("acepta rutas internas", () => {
-    expect(safeCallbackUrl("/comercios?categoria=licores")).toBe("/comercios?categoria=licores");
+    expect(safeCallbackUrl("/comercios?categoria=bebidas")).toBe("/comercios?categoria=bebidas");
   });
 
   it("convierte URLs absolutas del proxy en rutas internas", () => {
-    expect(safeCallbackUrl("http://localhost:3000/comercios?categoria=licores")).toBe(
-      "/comercios?categoria=licores",
+    expect(safeCallbackUrl("http://localhost:3000/comercios?categoria=bebidas")).toBe(
+      "/comercios?categoria=bebidas",
     );
   });
 

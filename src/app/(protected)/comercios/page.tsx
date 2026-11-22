@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
+import { CategoryBanner } from "@/components/category-banner";
 import { CategoryChips } from "@/components/category-chips";
 import { StoreAvatar } from "@/components/store-avatar";
 import { categoryFromSlug, categoryLabel } from "@/modules/catalog/categories";
@@ -24,11 +25,15 @@ export default async function StoresPage({ searchParams }: PageProps<"/comercios
         <h1 className="font-display text-[34px] leading-none tracking-[-0.03em] text-balance sm:text-[44px]">
           {firstName ? `${firstName}, ¿qué te llevamos hoy?` : "¿Qué te llevamos hoy?"}
         </h1>
-        <p className="text-[15px] text-ink-soft">
-          {category ? `${category.label} en Otavalo` : "Todos los comercios de Otavalo"} ·{" "}
-          <span className="tabular">{stores.length}</span> {stores.length === 1 ? "disponible" : "disponibles"}
-        </p>
+        {!category && (
+          <p className="text-[15px] text-ink-soft">
+            Todos los comercios de Otavalo · <span className="tabular">{stores.length}</span>{" "}
+            {stores.length === 1 ? "disponible" : "disponibles"}
+          </p>
+        )}
       </div>
+
+      {category && <CategoryBanner label={category.label} image={category.image} count={stores.length} />}
 
       <CategoryChips active={category?.slug ?? ""} withAll />
 

@@ -8,11 +8,11 @@ web
 
 ## Users
 
-Residentes de **Otavalo (Imbabura, Ecuador)** que piden a domicilio en cinco categorías: **Restaurantes, Market, Farmacia, Licores y Mascotas** (no hay encomiendas). Usan el **celular y la computadora por igual** (confirmado), así que ninguna de las dos experiencias es secundaria.
+Residentes de **Otavalo (Imbabura, Ecuador)** que piden a domicilio en cinco categorías: **Restaurantes, Market, Farmacia, Bebidas y Mascotas** (no hay encomiendas). Usan el **celular y la computadora por igual** (confirmado), así que ninguna de las dos experiencias es secundaria.
 
 Audiencias secundarias:
 - **Dueño/operador de Dfly:** recibe cada pedido completo por WhatsApp y lo supervisa en el panel admin.
-- **Comercios (restaurantes, markets, farmacias, licorerías, tiendas de mascotas):** no usan la web; reciben el pedido por WhatsApp y lo aceptan o rechazan con un botón.
+- **Comercios (restaurantes, markets, farmacias, tiendas de bebidas y licorerías, tiendas de mascotas):** no usan la web; reciben el pedido por WhatsApp y lo aceptan o rechazan con un botón.
 
 ## Product Purpose
 

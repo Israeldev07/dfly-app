@@ -34,7 +34,7 @@ export default async function HomePage() {
             Todo lo que necesitas, en una sola <span className="text-route">ruta</span>.
           </h1>
           <p style={step(1)} className="hero-in max-w-[44ch] text-[16px] leading-[1.55] font-medium text-paper">
-            Restaurantes, market, farmacia, licores y mascotas de Otavalo en un solo lugar. Elige qué
+            Restaurantes, market, farmacia, bebidas y mascotas de Otavalo en un solo lugar. Elige qué
             necesitas y te lo llevamos.
           </p>
           <div style={step(2)} className="hero-in">

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { ImagePlus, Trash2, Undo2 } from "lucide-react";
+import { prepareImage } from "./compress-image";
 
 /**
  * Foto con vista previa. Envía `image` (archivo nuevo) y `removeImage` ("on" para quitar la actual).
@@ -11,7 +12,7 @@ export function ImageField({
   label,
   currentUrl,
   error,
-  hint = "JPG, PNG o WebP de hasta 4 MB. Mejor cuadrada.",
+  hint = "JPG, PNG o WebP. Las fotos grandes se reducen solas. Mejor cuadrada.",
 }: {
   label: string;
   currentUrl: string | null;
@@ -22,7 +23,8 @@ export function ImageField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
-  const [tooBig, setTooBig] = useState(false);
+  const [pickError, setPickError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const [lostPick, setLostPick] = useState(false);
 
   useEffect(() => () => (preview ? URL.revokeObjectURL(preview) : undefined), [preview]);
@@ -41,17 +43,25 @@ export function ImageField({
   }, [preview]);
 
   const shown = preview ?? (removed ? null : currentUrl);
-  const message = tooBig
-    ? "La foto pesa más de 4 MB. Usa una más liviana."
-    : (error ?? (lostPick ? "Vuelve a elegir la foto antes de guardar." : undefined));
+  const message = pickError ?? error ?? (lostPick ? "Vuelve a elegir la foto antes de guardar." : undefined);
 
-  function onPick(file: File | undefined) {
-    setTooBig(false);
-    if (!file) return;
-    if (file.size > 4 * 1024 * 1024) {
-      setTooBig(true);
-      if (inputRef.current) inputRef.current.value = "";
+  async function onPick(picked: File | undefined) {
+    const input = inputRef.current;
+    setPickError(null);
+    if (!picked || !input) return;
+    // Las fotos del celular pesan varios MB: se reducen aquí, antes de enviarlas con el formulario.
+    setPreparing(true);
+    const file = await prepareImage(picked);
+    setPreparing(false);
+    if (!file || file.size > 4 * 1024 * 1024) {
+      setPickError(file ? "La foto pesa más de 4 MB. Usa una más liviana." : "No pudimos leer esa foto. Prueba con otra en JPG o PNG.");
+      input.value = "";
       return;
+    }
+    if (file !== picked) {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input.files = transfer.files;
     }
     setPreview(URL.createObjectURL(file));
     setRemoved(false);
@@ -91,7 +101,7 @@ export function ImageField({
             aria-labelledby={`${id}-label`}
             aria-describedby={`${id}-msg`}
             aria-invalid={message ? true : undefined}
-            onChange={(e) => onPick(e.target.files?.[0])}
+            onChange={(e) => void onPick(e.target.files?.[0])}
             className="sr-only"
           />
         </label>
@@ -135,7 +145,7 @@ export function ImageField({
       </div>
       {removed && !preview ? <input type="hidden" name="removeImage" value="on" /> : null}
       <p id={`${id}-msg`} className={message ? "text-[13.5px] font-medium text-brand-deep" : "text-[13px] text-ink-soft"}>
-        {message ?? (removed && !preview ? "La foto se quitará al guardar." : hint)}
+        {preparing ? "Preparando la foto…" : (message ?? (removed && !preview ? "La foto se quitará al guardar." : hint))}
       </p>
     </div>
   );

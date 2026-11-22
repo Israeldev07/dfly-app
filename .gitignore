@@ -50,3 +50,12 @@ next-env.d.ts
 
 # configuración local de Claude Code (por máquina)
 /.claude/settings.local.json
+
+# Solo locales: herramientas de Claude, diseño de referencia y archivos sin uso en la app
+/.claude/
+/.impeccable/
+/skills-lock.json
+/Dfly Home v2.dc.html
+/README.md
+/public/images/hero-rider.jpg
+/public/videos/Sequence 03.mp4

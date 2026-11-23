@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
           Escribe el correo de tu cuenta y te enviaremos un enlace para elegir una contraseña nueva.
         </p>
       </div>
-      <div className="flex flex-col gap-5 rounded-surface bg-surface p-5 shadow-lift ring-1 ring-line sm:p-7">
+      <div className="flex flex-col gap-5">
         <ForgotPasswordForm />
       </div>
       <p className="text-center text-[14.5px] text-ink-soft">

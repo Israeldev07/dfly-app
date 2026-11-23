@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <h1 className="font-display text-[34px] leading-none tracking-[-0.03em]">Hola de nuevo</h1>
         <p className="text-[15px] text-ink-soft">Entra para ver los comercios de Otavalo y hacer tu pedido.</p>
       </div>
-      <div className="flex flex-col gap-5 rounded-surface bg-surface p-5 shadow-lift ring-1 ring-line sm:p-7">
+      <div className="flex flex-col gap-5">
         {restablecida === "1" ? (
           <p role="status" className="flex items-center gap-2 text-[14.5px] font-medium text-route-deep">
             <CheckCircle2 aria-hidden className="size-[18px] flex-none" strokeWidth={2.25} />

@@ -22,7 +22,7 @@ export default async function ResetPasswordPage({ searchParams }: PageProps<"/re
             : "Los enlaces vencen a los 30 minutos y sirven una sola vez. Pide uno nuevo."}
         </p>
       </div>
-      <div className="flex flex-col gap-5 rounded-surface bg-surface p-5 shadow-lift ring-1 ring-line sm:p-7">
+      <div className="flex flex-col gap-5">
         {valid && typeof token === "string" ? (
           <ResetPasswordForm token={token} />
         ) : (

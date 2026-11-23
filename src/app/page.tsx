@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CategoryChips } from "@/components/category-chips";
 import { HeroVideo } from "@/components/hero-video";
-import { StoreFeature } from "@/components/store-feature";
+import { StoreCard } from "@/components/store-card";
 import { listStores } from "@/modules/catalog/queries";
 
 /** Posición en la entrada escalonada del hero (ver `.hero-in` en globals.css). */
@@ -11,7 +11,6 @@ const step = (i: number) => ({ "--i": i }) as CSSProperties;
 
 export default async function HomePage() {
   const stores = await listStores().catch(() => []);
-  const [featured, ...rest] = stores;
 
   return (
     <main className="flex flex-1 flex-col">
@@ -52,37 +51,70 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="flex flex-col items-center gap-9 px-4 pt-16 pb-20 sm:px-8 sm:pt-[72px] sm:pb-[84px]">
-        <h2 className="text-[15px] font-bold text-ink/80">Comercios en Otavalo</h2>
-        {featured ? (
-          <>
-            <StoreFeature store={featured} />
-            {rest.length > 0 ? (
-              <ul className="w-full max-w-3xl divide-y divide-line rounded-surface bg-surface ring-1 ring-line">
-                {rest.map((s) => (
-                  <li key={s.id}>
-                    <Link
-                      href={`/comercios/${s.slug}`}
-                      className="flex min-h-16 items-center justify-between gap-4 px-5 py-3 text-ink no-underline transition-colors duration-150 hover:bg-ink/[0.03] sm:px-6"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-[16px] font-semibold">{s.name}</span>
-                        <span className="block text-[13.5px] text-ink/65">
-                          {s.sector} · {s.etaMinutes} min
-                        </span>
-                      </span>
-                      <ArrowRight aria-hidden className="size-[18px] flex-none text-store" strokeWidth={1.75} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </>
+      {/* Comercios en una fila horizontal: en móvil se desliza con el dedo (con imán por tarjeta);
+          en pantallas anchas caben varios a la vez y el resto se alcanza con scroll lateral. */}
+      <section aria-labelledby="comercios" className="mx-auto flex w-full max-w-7xl flex-col gap-7 pt-16 pb-20 sm:pt-[72px] sm:pb-[84px]">
+        <div className="flex items-end justify-between gap-4 px-4 sm:px-8">
+          <h2 id="comercios" className="font-display text-[26px] leading-none tracking-[-0.025em] sm:text-[32px]">
+            Comercios en Otavalo
+          </h2>
+          {stores.length > 0 ? (
+            <Link
+              href="/comercios"
+              className="inline-flex items-center gap-1.5 text-[14.5px] font-semibold text-store no-underline hover:underline"
+            >
+              Ver todos
+              <ArrowRight aria-hidden className="size-4" strokeWidth={2} />
+            </Link>
+          ) : null}
+        </div>
+        {stores.length > 0 ? (
+          <ul className="flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pt-1 pb-4 sm:scroll-px-8 sm:gap-5 sm:px-8">
+            {stores.map((s) => (
+              <li key={s.id} className="w-[72%] flex-none snap-start sm:w-[280px]">
+                <StoreCard store={s} />
+              </li>
+            ))}
+          </ul>
         ) : (
-          <p className="max-w-[40ch] text-center text-[15px] text-ink-soft">
+          <p className="max-w-[40ch] px-4 text-[15px] text-ink-soft sm:px-8">
             Estamos sumando comercios de Otavalo. Vuelve pronto.
           </p>
         )}
+      </section>
+
+      {/* Trayectoria de la empresa, en el azul del hero. */}
+      <section aria-labelledby="trayectoria" className="bg-hero-deep text-paper">
+        <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 pt-14 pb-16 sm:px-8 sm:pt-[72px] sm:pb-[80px] lg:grid-cols-[1.1fr_1fr] lg:gap-16">
+          <div className="flex flex-col gap-4">
+            <p className="text-[12.5px] font-bold tracking-[0.14em] text-route">DELIVERY FLYMOTO.EC</p>
+            <h2
+              id="trayectoria"
+              className="max-w-[18ch] font-display text-[30px] leading-[1.05] tracking-[-0.025em] text-balance sm:text-[38px]"
+            >
+              Conectamos lo que necesitas con el lugar donde lo necesitas.
+            </h2>
+          </div>
+          <div className="flex flex-col gap-5 text-[15.5px] leading-[1.6] text-paper/85">
+            <p>
+              Desde Otavalo, construimos una nueva forma de entender el servicio de delivery: más ágil, más
+              cercana y pensada para las necesidades reales de nuestros clientes y aliados comerciales.
+            </p>
+            <p>
+              Realizamos entregas de comida rápida, supermercados, paquetería, medicamentos y diferentes tipos
+              de pedidos, brindando una alternativa práctica para quienes necesitan enviar o recibir productos
+              de manera eficiente.
+            </p>
+            <p className="border-l-2 border-route pl-4 text-paper">
+              Desde el{" "}
+              <time dateTime="2023-11-19" className="font-bold text-route">
+                19 de noviembre de 2023
+              </time>
+              , hemos trabajado para convertir cada entrega en una experiencia basada en confianza,
+              responsabilidad y eficiencia.
+            </p>
+          </div>
+        </div>
       </section>
     </main>
   );

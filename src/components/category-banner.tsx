@@ -29,7 +29,7 @@ export function CategoryBanner({ label, image, count }: Props) {
         width={208}
         height={208}
         sizes="(min-width: 640px) 208px, 128px"
-        priority
+        loading="eager"
         className="size-32 flex-none object-contain sm:size-52"
       />
     </section>

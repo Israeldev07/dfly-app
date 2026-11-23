@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
 import { CategoryBanner } from "@/components/category-banner";
-import { CategoryChips } from "@/components/category-chips";
+import { CategoryTiles } from "@/components/category-tiles";
 import { StoreAvatar } from "@/components/store-avatar";
 import { categoryFromSlug, categoryLabel } from "@/modules/catalog/categories";
 import { listStores } from "@/modules/catalog/queries";
@@ -35,7 +35,7 @@ export default async function StoresPage({ searchParams }: PageProps<"/comercios
 
       {category && <CategoryBanner label={category.label} image={category.image} count={stores.length} />}
 
-      <CategoryChips active={category?.slug ?? ""} withAll />
+      <CategoryTiles active={category?.slug ?? ""} />
 
       {stores.length === 0 ? (
         <div className="flex flex-col items-start gap-3 rounded-surface bg-surface p-6 ring-1 ring-line sm:p-8">

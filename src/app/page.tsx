@@ -30,11 +30,11 @@ export default async function HomePage() {
             style={step(0)}
             className="hero-in max-w-[11ch] font-display text-[44px] leading-[0.96] tracking-[-0.035em] text-balance text-paper sm:text-[60px]"
           >
-            Todo lo que necesitas, en una sola <span className="text-route">ruta</span>.
+            Todo lo que necesitas, en una sola <span className="text-route">ruta</span>
           </h1>
           <p style={step(1)} className="hero-in max-w-[44ch] text-[16px] leading-[1.55] font-medium text-paper">
             Restaurantes, market, farmacia, bebidas y mascotas de Otavalo en un solo lugar. Elige qué
-            necesitas y te lo llevamos.
+            necesitas y lo llevamos por ti.
           </p>
           <div style={step(2)} className="hero-in">
             <Link
@@ -92,7 +92,7 @@ export default async function HomePage() {
               id="trayectoria"
               className="max-w-[18ch] font-display text-[30px] leading-[1.05] tracking-[-0.025em] text-balance sm:text-[38px]"
             >
-              Conectamos lo que necesitas con el lugar donde lo necesitas.
+              Conectamos lo que necesitas con el lugar donde lo necesitas
             </h2>
           </div>
           <div className="flex flex-col gap-5 text-[15.5px] leading-[1.6] text-paper/85">

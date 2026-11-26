@@ -75,6 +75,31 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Texto de las páginas legales (privacidad, términos): párrafos y listas legibles sin plugin de tipografía. */
+@layer components {
+  .legal-prose > * + * {
+    margin-top: 0.85em;
+  }
+  .legal-prose ul {
+    list-style: disc;
+    padding-left: 1.25em;
+  }
+  .legal-prose ul > li + li {
+    margin-top: 0.4em;
+  }
+  .legal-prose li::marker {
+    color: var(--color-route-deep);
+  }
+  .legal-prose strong {
+    font-weight: 700;
+  }
+  .legal-prose a {
+    color: var(--color-store);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
 /* Menú desplegable: sale de su botón (origen arriba a la derecha) con escala + opacidad.
    Transiciones, no keyframes, para que abrir/cerrar rápido se reoriente sin saltos. */
 @layer components {

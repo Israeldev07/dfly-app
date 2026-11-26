@@ -89,6 +89,18 @@ export function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
         ) : null}
       </div>
 
+      <p className="text-[13.5px] leading-snug text-ink-soft">
+        Al crear tu cuenta confirmas que eres mayor de 18 años, aceptas los{" "}
+        <a href="/terminos" target="_blank" className="font-semibold text-store underline underline-offset-2">
+          Términos y condiciones
+        </a>{" "}
+        y declaras haber leído la{" "}
+        <a href="/privacidad" target="_blank" className="font-semibold text-store underline underline-offset-2">
+          Política de privacidad
+        </a>
+        .
+      </p>
+
       <SubmitButton pendingLabel="Creando tu cuenta…">Crear cuenta</SubmitButton>
     </form>
   );
